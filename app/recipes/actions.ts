@@ -82,5 +82,5 @@ export async function createRecipe(input: CreateRecipeInput) {
     },
   })
 
-  redirect(`/recipes/${recipe.id}`)
+  redirect('/')
 }
