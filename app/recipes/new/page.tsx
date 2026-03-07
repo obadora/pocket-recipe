@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { createRecipe, type IngredientInput, type StepInput } from '../actions'
 
 export default function NewRecipePage() {
@@ -56,7 +57,8 @@ export default function NewRecipePage() {
     startTransition(async () => {
       try {
         await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories })
-      } catch {
+      } catch (err) {
+        if (isRedirectError(err)) throw err
         setError('保存に失敗しました。もう一度お試しください。')
       }
     })
