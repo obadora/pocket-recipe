@@ -3,16 +3,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const {
   mockGetUser,
   mockRecipeCreate,
+  mockRecipeUpdate,
   mockCategoryUpsert,
   mockRecipeDelete,
   mockRecipeFindFirst,
+  mockIngredientDeleteMany,
+  mockStepDeleteMany,
+  mockRecipeCategoryDeleteMany,
+  mockIngredientCreateMany,
+  mockStepCreateMany,
+  mockRecipeCategoryCreateMany,
+  mockTransaction,
   mockRedirect,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockRecipeCreate: vi.fn(),
+  mockRecipeUpdate: vi.fn(),
   mockCategoryUpsert: vi.fn(),
   mockRecipeDelete: vi.fn(),
   mockRecipeFindFirst: vi.fn(),
+  mockIngredientDeleteMany: vi.fn(),
+  mockStepDeleteMany: vi.fn(),
+  mockRecipeCategoryDeleteMany: vi.fn(),
+  mockIngredientCreateMany: vi.fn(),
+  mockStepCreateMany: vi.fn(),
+  mockRecipeCategoryCreateMany: vi.fn(),
+  mockTransaction: vi.fn(),
   mockRedirect: vi.fn(),
 }))
 
@@ -24,8 +40,12 @@ vi.mock('../utils/supabase/server', () => ({
 
 vi.mock('../../lib/prisma', () => ({
   prisma: {
-    recipe: { create: mockRecipeCreate, delete: mockRecipeDelete, findFirst: mockRecipeFindFirst },
+    recipe: { create: mockRecipeCreate, update: mockRecipeUpdate, delete: mockRecipeDelete, findFirst: mockRecipeFindFirst },
     category: { upsert: mockCategoryUpsert },
+    ingredient: { deleteMany: mockIngredientDeleteMany, createMany: mockIngredientCreateMany },
+    step: { deleteMany: mockStepDeleteMany, createMany: mockStepCreateMany },
+    recipeCategory: { deleteMany: mockRecipeCategoryDeleteMany, createMany: mockRecipeCategoryCreateMany },
+    $transaction: mockTransaction,
   },
 }))
 
@@ -33,7 +53,7 @@ vi.mock('next/navigation', () => ({
   redirect: mockRedirect,
 }))
 
-import { createRecipe, deleteRecipe } from './actions'
+import { createRecipe, deleteRecipe, updateRecipe } from './actions'
 
 const baseInput = {
   title: '肉じゃが',
@@ -210,6 +230,134 @@ describe('createRecipe', () => {
     expect(mockCategoryUpsert).toHaveBeenCalledTimes(1)
     expect(mockCategoryUpsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { name: '和食' } })
+    )
+  })
+})
+
+describe('updateRecipe', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockTransaction.mockImplementation(async (queries: Promise<unknown>[]) => Promise.all(queries))
+    mockIngredientDeleteMany.mockResolvedValue({})
+    mockStepDeleteMany.mockResolvedValue({})
+    mockRecipeCategoryDeleteMany.mockResolvedValue({})
+    mockRecipeUpdate.mockResolvedValue({ id: 'recipe-1' })
+    mockIngredientCreateMany.mockResolvedValue({})
+    mockStepCreateMany.mockResolvedValue({})
+    mockRecipeCategoryCreateMany.mockResolvedValue({})
+  })
+
+  it('未認証の場合: /login にリダイレクトし $transaction を呼ばない', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } })
+
+    await updateRecipe('recipe-1', baseInput)
+
+    expect(mockTransaction).not.toHaveBeenCalled()
+    expect(mockRedirect).toHaveBeenCalledWith('/login')
+  })
+
+  it('他人のレシピの場合: / にリダイレクトし $transaction を呼ばない', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeFindFirst.mockResolvedValue(null)
+
+    await updateRecipe('recipe-other', baseInput)
+
+    expect(mockTransaction).not.toHaveBeenCalled()
+    expect(mockRedirect).toHaveBeenCalledWith('/')
+  })
+
+  it('成功時: $transaction を呼び /recipes/recipe-1 にリダイレクトする', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+
+    await updateRecipe('recipe-1', baseInput)
+
+    expect(mockTransaction).toHaveBeenCalled()
+    expect(mockRedirect).toHaveBeenCalledWith('/recipes/recipe-1')
+  })
+
+  it('servings・cookTime が数値文字列の場合: parseInt して update に渡す', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+
+    await updateRecipe('recipe-1', { ...baseInput, servings: '4', cookTime: '30' })
+
+    expect(mockRecipeUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ servings: 4, cookTime: 30 }),
+      })
+    )
+  })
+
+  it('servings・cookTime が空文字の場合: null を update に渡す', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+
+    await updateRecipe('recipe-1', { ...baseInput, servings: '', cookTime: '' })
+
+    expect(mockRecipeUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ servings: null, cookTime: null }),
+      })
+    )
+  })
+
+  it('name が空の材料はフィルタリングされる', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+
+    await updateRecipe('recipe-1', {
+      ...baseInput,
+      ingredients: [
+        { name: 'じゃがいも', amount: '2', unit: '個' },
+        { name: '  ', amount: '', unit: '' },
+      ],
+    })
+
+    expect(mockIngredientCreateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([expect.objectContaining({ name: 'じゃがいも' })]),
+      })
+    )
+    const createCall = mockIngredientCreateMany.mock.calls[0][0]
+    expect(createCall.data).toHaveLength(1)
+  })
+
+  it('description が空の手順はフィルタリングされる', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+
+    await updateRecipe('recipe-1', {
+      ...baseInput,
+      steps: [{ description: '具材を炒める' }, { description: '' }],
+    })
+
+    expect(mockStepCreateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([expect.objectContaining({ description: '具材を炒める' })]),
+      })
+    )
+    const createCall = mockStepCreateMany.mock.calls[0][0]
+    expect(createCall.data).toHaveLength(1)
+  })
+
+  it('カテゴリがある場合: prisma.category.upsert を呼ぶ', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+    mockCategoryUpsert
+      .mockResolvedValueOnce({ id: 'cat-1' })
+      .mockResolvedValueOnce({ id: 'cat-2' })
+
+    await updateRecipe('recipe-1', { ...baseInput, categories: ['和食', '夕食'] })
+
+    expect(mockCategoryUpsert).toHaveBeenCalledTimes(2)
+    expect(mockRecipeCategoryCreateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          { recipeId: 'recipe-1', categoryId: 'cat-1' },
+          { recipeId: 'recipe-1', categoryId: 'cat-2' },
+        ],
+      })
     )
   })
 })
