@@ -10,6 +10,10 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
+    if (error) {
+      console.error('[auth/callback] exchangeCodeForSession error:', error)
+    }
+
     if (!error && data.user) {
       // Supabase AuthユーザーをPrisma DBに同期
       await prisma.user.upsert({
