@@ -6,10 +6,14 @@ import { createClient } from './app/utils/supabase/server'
 const PUBLIC_PATHS = ['/login', '/signup', '/auth/callback']
 
 export async function middleware(request: NextRequest) {
-  const response = await updateSession(request)
-
   const { pathname } = request.nextUrl
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
+
+  if (pathname.startsWith('/auth/callback')) {
+    return NextResponse.next()
+  }
+
+  const response = await updateSession(request)
 
   if (!isPublic) {
     const supabase = await createClient()
