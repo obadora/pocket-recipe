@@ -73,7 +73,25 @@ Supabase Auth and Prisma `User` table are kept in sync via `prisma.user.upsert` 
 
 ### Testing
 
-Vitest is configured in `vitest.config.ts` (node environment). Tests live alongside source files (e.g. `app/(auth)/actions.test.ts`). Use `vi.hoisted()` when defining mock variables used inside `vi.mock()` factory functions.
+**Development follows TDD (Test-Driven Development). Always write tests before implementation.**
+
+1. Write a failing test (RED)
+2. Implement the minimum code to pass (GREEN)
+3. Refactor if needed
+
+Vitest is configured in `vitest.config.ts` with two projects:
+
+| Project | Environment | File pattern | Target |
+|---|---|---|---|
+| `unit` | node | `*.test.ts` | Server Actions, utilities |
+| `component` | happy-dom | `*.test.tsx` | React components |
+
+Tests live alongside source files (e.g. `app/(auth)/actions.test.ts`).
+
+Key conventions:
+- Use `vi.hoisted()` when defining mock variables used inside `vi.mock()` factory functions
+- Component tests use `@testing-library/react` and `@testing-library/user-event`
+- Setup file for component tests: `vitest.setup.ts` (imports `@testing-library/jest-dom`)
 
 ### Dev Utilities
 
