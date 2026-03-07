@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '../../utils/supabase/server'
 import { prisma } from '../../../lib/prisma'
+import DeleteButton from './DeleteButton'
 
 type Props = {
   params: Promise<{ id: string }>
@@ -30,7 +31,8 @@ export default async function RecipeDetailPage({ params }: Props) {
           <Link href="/" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
             ← 一覧へ
           </Link>
-          <h1 className="text-lg font-semibold text-zinc-900 truncate">{recipe.title}</h1>
+          <h1 className="text-lg font-semibold text-zinc-900 truncate flex-1">{recipe.title}</h1>
+          <DeleteButton recipeId={recipe.id} />
         </div>
       </header>
 
