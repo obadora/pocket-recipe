@@ -1,3 +1,4 @@
+
 'use server'
 
 import { redirect } from 'next/navigation'
@@ -82,5 +83,29 @@ export async function createRecipe(input: CreateRecipeInput) {
     },
   })
 
+  redirect('/')
+}
+
+export async function deleteRecipe(recipeId: string) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+    return
+  }
+
+  const recipe = await prisma.recipe.findFirst({
+    where: { id: recipeId, userId: user.id },
+  })
+
+  if (!recipe) {
+    redirect('/')
+    return
+  }
+
+  await prisma.recipe.delete({ where: { id: recipeId } })
   redirect('/')
 }

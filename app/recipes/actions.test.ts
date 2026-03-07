@@ -4,11 +4,15 @@ const {
   mockGetUser,
   mockRecipeCreate,
   mockCategoryUpsert,
+  mockRecipeDelete,
+  mockRecipeFindFirst,
   mockRedirect,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockRecipeCreate: vi.fn(),
   mockCategoryUpsert: vi.fn(),
+  mockRecipeDelete: vi.fn(),
+  mockRecipeFindFirst: vi.fn(),
   mockRedirect: vi.fn(),
 }))
 
@@ -20,7 +24,7 @@ vi.mock('../utils/supabase/server', () => ({
 
 vi.mock('../../lib/prisma', () => ({
   prisma: {
-    recipe: { create: mockRecipeCreate },
+    recipe: { create: mockRecipeCreate, delete: mockRecipeDelete, findFirst: mockRecipeFindFirst },
     category: { upsert: mockCategoryUpsert },
   },
 }))
@@ -29,7 +33,7 @@ vi.mock('next/navigation', () => ({
   redirect: mockRedirect,
 }))
 
-import { createRecipe } from './actions'
+import { createRecipe, deleteRecipe } from './actions'
 
 const baseInput = {
   title: '肉じゃが',
@@ -53,7 +57,7 @@ describe('createRecipe', () => {
     expect(mockRedirect).toHaveBeenCalledWith('/login')
   })
 
-  it('成功時: prisma.recipe.create を呼び、/recipes/:id にリダイレクトする', async () => {
+  it('成功時: prisma.recipe.create を呼び、/ にリダイレクトする', async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: 'user-1' } },
     })
@@ -70,7 +74,7 @@ describe('createRecipe', () => {
         }),
       })
     )
-    expect(mockRedirect).toHaveBeenCalledWith('/recipes/recipe-abc')
+    expect(mockRedirect).toHaveBeenCalledWith('/')
   })
 
   it('servings・cookTime が数値文字列の場合: parseInt して渡す', async () => {
@@ -207,5 +211,42 @@ describe('createRecipe', () => {
     expect(mockCategoryUpsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { name: '和食' } })
     )
+  })
+})
+
+describe('deleteRecipe', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('未認証の場合: prisma.recipe.delete を呼ばず /login にリダイレクトする', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } })
+
+    await deleteRecipe('recipe-1')
+
+    expect(mockRecipeDelete).not.toHaveBeenCalled()
+    expect(mockRedirect).toHaveBeenCalledWith('/login')
+  })
+
+  it('他人のレシピの場合: prisma.recipe.delete を呼ばず / にリダイレクトする', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeFindFirst.mockResolvedValue(null)
+
+    await deleteRecipe('recipe-other')
+
+    expect(mockRecipeDelete).not.toHaveBeenCalled()
+    expect(mockRedirect).toHaveBeenCalledWith('/')
+  })
+
+  it('自分のレシピの場合: prisma.recipe.delete を呼び / にリダイレクトする', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+    mockRecipeDelete.mockResolvedValue({})
+
+    await deleteRecipe('recipe-1')
+
+    expect(mockRecipeFindFirst).toHaveBeenCalledWith({
+      where: { id: 'recipe-1', userId: 'user-1' },
+    })
+    expect(mockRecipeDelete).toHaveBeenCalledWith({ where: { id: 'recipe-1' } })
+    expect(mockRedirect).toHaveBeenCalledWith('/')
   })
 })
