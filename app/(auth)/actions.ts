@@ -1,7 +1,6 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { createClient } from '../utils/supabase/server'
 import { prisma } from '../../lib/prisma'
 
@@ -41,13 +40,11 @@ export async function signIn(formData: FormData) {
 }
 
 export async function signInWithGoogle() {
-  const headersList = await headers()
-  const origin = headersList.get('origin') ?? process.env.NEXT_PUBLIC_SITE_URL
   const supabase = await createClient()
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${origin}/auth/callback`,
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
     },
   })
 
