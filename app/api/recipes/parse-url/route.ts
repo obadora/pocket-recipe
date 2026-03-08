@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '../../../utils/supabase/server'
 
 const CHROMIUM_REMOTE_URL =
-  'https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.tar'
+  'https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar'
 
 async function launchBrowser() {
   if (process.env.VERCEL) {
