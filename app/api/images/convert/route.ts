@@ -28,8 +28,8 @@ export async function POST(req: NextRequest) {
     }
 
     const jpegBuffer = await sharp(buffer)
-      .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 85 })
+      .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 70 })
       .toBuffer()
 
     return new NextResponse(new Uint8Array(jpegBuffer), {

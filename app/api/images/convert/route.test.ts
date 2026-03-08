@@ -41,8 +41,8 @@ describe('POST /api/images/convert', () => {
     const res = await POST(makeFormData(file) as unknown as Request)
 
     expect(mockHeicTo).not.toHaveBeenCalled()
-    expect(mockSharpInstance.resize).toHaveBeenCalledWith(1920, 1920, { fit: 'inside', withoutEnlargement: true })
-    expect(mockSharpInstance.jpeg).toHaveBeenCalledWith({ quality: 85 })
+    expect(mockSharpInstance.resize).toHaveBeenCalledWith(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+    expect(mockSharpInstance.jpeg).toHaveBeenCalledWith({ quality: 70 })
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toBe('image/jpeg')
   })
