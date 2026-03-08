@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '../../../utils/supabase/server'
 
+const CHROMIUM_REMOTE_URL =
+  'https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.tar'
+
 async function launchBrowser() {
   if (process.env.VERCEL) {
-    const chromium = await import('@sparticuz/chromium')
+    const chromium = await import('@sparticuz/chromium-min')
     const puppeteerCore = await import('puppeteer-core')
     return puppeteerCore.default.launch({
       args: chromium.default.args,
-      executablePath: await chromium.default.executablePath(),
+      executablePath: await chromium.default.executablePath(CHROMIUM_REMOTE_URL),
       headless: true,
     })
   }
