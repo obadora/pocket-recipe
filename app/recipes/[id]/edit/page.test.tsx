@@ -2,9 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-const { mockUpdateRecipe, mockRouterBack } = vi.hoisted(() => ({
+const { mockUpdateRecipe, mockRouterBack, mockSupabaseGetUser, mockSupabaseUpload, mockSupabaseGetPublicUrl } = vi.hoisted(() => ({
   mockUpdateRecipe: vi.fn(),
   mockRouterBack: vi.fn(),
+  mockSupabaseGetUser: vi.fn(),
+  mockSupabaseUpload: vi.fn(),
+  mockSupabaseGetPublicUrl: vi.fn(),
 }))
 
 vi.mock('../../actions', () => ({
@@ -13,6 +16,24 @@ vi.mock('../../actions', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ back: mockRouterBack }),
+}))
+
+vi.mock('../../../utils/imageConverter', () => ({
+  convertImage: vi.fn().mockImplementation((file: File) =>
+    Promise.resolve({ convertedFile: file, previewUrl: 'blob:mock' })
+  ),
+}))
+
+vi.mock('../../../utils/supabase/client', () => ({
+  createClient: vi.fn().mockReturnValue({
+    auth: { getUser: mockSupabaseGetUser },
+    storage: {
+      from: vi.fn().mockReturnValue({
+        upload: mockSupabaseUpload,
+        getPublicUrl: mockSupabaseGetPublicUrl,
+      }),
+    },
+  }),
 }))
 
 import EditRecipeForm from './EditRecipeForm'
@@ -25,18 +46,66 @@ const defaultInitialValues = {
   ingredients: [{ name: 'じゃがいも', amount: '2', unit: '個' }],
   steps: [{ description: '具材を炒める' }],
   categories: ['和食'],
+  imageUrl: null as string | null,
 }
 
 describe('EditRecipeForm', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockSupabaseGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+  })
 
-  it('各セクション（基本情報・カテゴリ・材料・手順）が表示される', () => {
+  it('各セクション（写真・基本情報・カテゴリ・材料・手順）が表示される', () => {
     render(<EditRecipeForm recipeId="recipe-1" initialValues={defaultInitialValues} />)
 
+    expect(screen.getByText('写真')).toBeInTheDocument()
     expect(screen.getByText('基本情報')).toBeInTheDocument()
     expect(screen.getByText('カテゴリ')).toBeInTheDocument()
     expect(screen.getByText('材料')).toBeInTheDocument()
     expect(screen.getByText('手順')).toBeInTheDocument()
+  })
+
+  it('既存の imageUrl がある場合に現在の写真が表示される', () => {
+    render(
+      <EditRecipeForm
+        recipeId="recipe-1"
+        initialValues={{ ...defaultInitialValues, imageUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/user-1/photo.jpg' }}
+      />
+    )
+
+    expect(screen.getByRole('img', { name: '現在の写真' })).toBeInTheDocument()
+  })
+
+  it('新しいファイルを選択するとプレビューが表示される', async () => {
+    const user = userEvent.setup()
+    render(<EditRecipeForm recipeId="recipe-1" initialValues={defaultInitialValues} />)
+
+    const file = new File(['dummy'], 'photo.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText('写真を選択'), file)
+
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: 'プレビュー' })).toBeInTheDocument()
+    })
+  })
+
+  it('写真付きで送信すると storage.upload が呼ばれ updateRecipe に imageUrl が渡される', async () => {
+    const user = userEvent.setup()
+    mockSupabaseUpload.mockResolvedValue({ data: { path: 'user-1/uuid.jpg' }, error: null })
+    mockSupabaseGetPublicUrl.mockReturnValue({ data: { publicUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/user-1/uuid.jpg' } })
+    mockUpdateRecipe.mockResolvedValue(undefined)
+    render(<EditRecipeForm recipeId="recipe-1" initialValues={defaultInitialValues} />)
+
+    const file = new File(['dummy'], 'photo.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText('写真を選択'), file)
+    await user.click(screen.getByRole('button', { name: '変更を保存' }))
+
+    await waitFor(() => {
+      expect(mockSupabaseUpload).toHaveBeenCalled()
+      expect(mockUpdateRecipe).toHaveBeenCalledWith(
+        'recipe-1',
+        expect.objectContaining({ imageUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/user-1/uuid.jpg' })
+      )
+    })
   })
 
   it('initialValues がフォームに反映される', () => {

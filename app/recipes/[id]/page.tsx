@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '../../utils/supabase/server'
 import { prisma } from '../../../lib/prisma'
 import DeleteButton from './DeleteButton'
@@ -43,6 +44,20 @@ export default async function RecipeDetailPage({ params }: Props) {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+        {recipe.imageUrl && (
+          <section className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+            <div className="relative w-full aspect-video">
+              <Image
+                src={recipe.imageUrl}
+                alt={recipe.title}
+                fill
+                className="object-cover"
+                sizes="(max-width: 672px) 100vw, 672px"
+              />
+            </div>
+          </section>
+        )}
+
         <section className="bg-white rounded-xl border border-zinc-200 p-6 space-y-3">
           {recipe.description && (
             <p className="text-sm text-zinc-600 leading-relaxed">{recipe.description}</p>

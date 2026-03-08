@@ -37,6 +37,7 @@ export default async function EditRecipePage({ params }: Props) {
     })),
     steps: recipe.steps.map((step) => ({ description: step.description })),
     categories: recipe.categories.map((rc) => rc.category.name),
+    imageUrl: recipe.imageUrl,
   }
 
   return <EditRecipeForm recipeId={recipe.id} initialValues={initialValues} />

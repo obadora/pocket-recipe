@@ -23,6 +23,7 @@ export type CreateRecipeInput = {
   ingredients: IngredientInput[]
   steps: StepInput[]
   categories: string[]
+  imageUrl?: string
 }
 
 export async function createRecipe(input: CreateRecipeInput) {
@@ -58,7 +59,8 @@ export async function createRecipe(input: CreateRecipeInput) {
       description: input.description || null,
       servings,
       cookTime,
-      sourceType: 'manual',
+      imageUrl: input.imageUrl ?? null,
+      sourceType: input.imageUrl ? 'photo' : 'manual',
       ingredients: {
         create: input.ingredients
           .filter((ing) => ing.name.trim())
@@ -152,6 +154,8 @@ export async function updateRecipe(recipeId: string, input: UpdateRecipeInput) {
         description: input.description || null,
         servings,
         cookTime,
+        imageUrl: input.imageUrl ?? null,
+        sourceType: input.imageUrl ? 'photo' : 'manual',
       },
     }),
     prisma.ingredient.createMany({ data: filteredIngredients }),
@@ -182,6 +186,14 @@ export async function deleteRecipe(recipeId: string) {
   if (!recipe) {
     redirect('/')
     return
+  }
+
+  if (recipe.imageUrl) {
+    const url = new URL(recipe.imageUrl)
+    const pathParts = url.pathname.split('/storage/v1/object/public/recipe-images/')
+    if (pathParts[1]) {
+      await supabase.storage.from('recipe-images').remove([pathParts[1]])
+    }
   }
 
   await prisma.recipe.delete({ where: { id: recipeId } })
