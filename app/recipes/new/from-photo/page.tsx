@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
-import { createRecipe, type IngredientInput, type StepInput } from '../actions'
-import { createClient } from '../../utils/supabase/client'
-import { convertImage } from '../../utils/imageConverter'
+import { createRecipe, type IngredientInput, type StepInput } from '../../actions'
+import { createClient } from '../../../utils/supabase/client'
+import { convertImage } from '../../../utils/imageConverter'
+import { parseRecipeFromImage } from '../../../utils/recipeParser'
 
-export default function NewRecipePage() {
+export default function FromPhotoPage() {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -26,6 +26,8 @@ export default function NewRecipePage() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [isParsing, setIsParsing] = useState(false)
+  const [parseError, setParseError] = useState<string | null>(null)
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -35,12 +37,30 @@ export default function NewRecipePage() {
       return
     }
     setUploadError(null)
+    setParseError(null)
+    let convertedFile: File
     try {
-      const { convertedFile, previewUrl } = await convertImage(file)
+      const result = await convertImage(file)
+      convertedFile = result.convertedFile
       setImageFile(convertedFile)
-      setImagePreviewUrl(previewUrl)
+      setImagePreviewUrl(result.previewUrl)
     } catch {
       setUploadError('画像の変換に失敗しました。もう一度お試しください。')
+      return
+    }
+    setIsParsing(true)
+    try {
+      const parsed = await parseRecipeFromImage(convertedFile)
+      if (parsed.title !== null) setTitle(parsed.title)
+      if (parsed.description !== null) setDescription(parsed.description)
+      if (parsed.servings !== null) setServings(String(parsed.servings))
+      if (parsed.cookTime !== null) setCookTime(String(parsed.cookTime))
+      if (parsed.ingredients.length > 0) setIngredients(parsed.ingredients)
+      if (parsed.steps.length > 0) setSteps(parsed.steps.map((s) => ({ description: s })))
+    } catch {
+      setParseError('解析に失敗しました。もう一度お試しください。')
+    } finally {
+      setIsParsing(false)
     }
   }
 
@@ -48,6 +68,7 @@ export default function NewRecipePage() {
     setImageFile(null)
     setImagePreviewUrl(null)
     setUploadError(null)
+    setParseError(null)
   }
 
   const addIngredient = () =>
@@ -123,7 +144,7 @@ export default function NewRecipePage() {
           >
             ← 戻る
           </button>
-          <h1 className="text-lg font-semibold text-zinc-900">レシピを登録</h1>
+          <h1 className="text-lg font-semibold text-zinc-900">写真からレシピを作成</h1>
         </div>
       </header>
 
@@ -137,18 +158,36 @@ export default function NewRecipePage() {
 
           {/* 写真 */}
           <section className="bg-white rounded-xl border border-zinc-200 p-6 space-y-4">
-            <h2 className="text-base font-semibold text-zinc-900">写真 <span className="ml-1 px-1.5 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-500">任意</span></h2>
+            <h2 className="text-base font-semibold text-zinc-900">写真</h2>
             {uploadError && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
                 {uploadError}
               </p>
             )}
             {imagePreviewUrl ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="w-full aspect-video rounded-lg overflow-hidden bg-zinc-100">
                   <img src={imagePreviewUrl} alt="プレビュー" className="w-full h-full object-cover" />
                 </div>
-                <button type="button" onClick={clearImage} className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
+                {isParsing && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-zinc-500">
+                    <svg className="animate-spin h-4 w-4 text-zinc-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    画像読み取り中・・・
+                  </div>
+                )}
+                {parseError && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                    {parseError}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={clearImage}
+                  className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+                >
                   写真を削除
                 </button>
               </div>

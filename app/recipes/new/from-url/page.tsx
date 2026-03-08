@@ -1,17 +1,20 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
-import { createRecipe, type IngredientInput, type StepInput } from '../actions'
-import { createClient } from '../../utils/supabase/client'
-import { convertImage } from '../../utils/imageConverter'
+import { createRecipe, type IngredientInput, type StepInput } from '../../actions'
+import { parseRecipeFromUrl } from '../../../utils/recipeUrlParser'
 
-export default function NewRecipePage() {
+export default function FromUrlPage() {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+
+  const [url, setUrl] = useState('')
+  const [urlError, setUrlError] = useState<string | null>(null)
+  const [isParsing, setIsParsing] = useState(false)
+  const [parseError, setParseError] = useState<string | null>(null)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -23,31 +26,34 @@ export default function NewRecipePage() {
   const [steps, setSteps] = useState<StepInput[]>([{ description: '' }])
   const [categoryInput, setCategoryInput] = useState('')
   const [categories, setCategories] = useState<string[]>([])
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
-  const [uploadError, setUploadError] = useState<string | null>(null)
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError('ファイルサイズは10MB以下にしてください。')
+  const handleLoadUrl = async () => {
+    if (!url.trim()) {
+      setUrlError('URLを入力してください。')
       return
     }
-    setUploadError(null)
     try {
-      const { convertedFile, previewUrl } = await convertImage(file)
-      setImageFile(convertedFile)
-      setImagePreviewUrl(previewUrl)
+      new URL(url)
     } catch {
-      setUploadError('画像の変換に失敗しました。もう一度お試しください。')
+      setUrlError('有効なURLを入力してください。')
+      return
     }
-  }
-
-  const clearImage = () => {
-    setImageFile(null)
-    setImagePreviewUrl(null)
-    setUploadError(null)
+    setUrlError(null)
+    setParseError(null)
+    setIsParsing(true)
+    try {
+      const parsed = await parseRecipeFromUrl(url)
+      if (parsed.title !== null) setTitle(parsed.title)
+      if (parsed.description !== null) setDescription(parsed.description)
+      if (parsed.servings !== null) setServings(String(parsed.servings))
+      if (parsed.cookTime !== null) setCookTime(String(parsed.cookTime))
+      if (parsed.ingredients.length > 0) setIngredients(parsed.ingredients)
+      if (parsed.steps.length > 0) setSteps(parsed.steps.map((s) => ({ description: s })))
+    } catch {
+      setParseError('解析に失敗しました。もう一度お試しください。')
+    } finally {
+      setIsParsing(false)
+    }
   }
 
   const addIngredient = () =>
@@ -85,25 +91,17 @@ export default function NewRecipePage() {
     setError(null)
     startTransition(async () => {
       try {
-        let imageUrl: string | undefined
-        if (imageFile) {
-          const supabase = createClient()
-          const { data: { user } } = await supabase.auth.getUser()
-          if (!user) {
-            setUploadError('セッションが切れました。再ログインしてください。')
-            return
-          }
-          const path = `${user.id}/${crypto.randomUUID()}.jpg`
-          const { error: uploadErr } = await supabase.storage.from('recipe-images').upload(path, imageFile)
-          if (uploadErr) {
-            console.error('Storageアップロードエラー:', uploadErr)
-            setUploadError(`写真のアップロードに失敗しました。(${uploadErr.message})`)
-            return
-          }
-          const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
-          imageUrl = publicUrl
-        }
-        await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories, imageUrl })
+        await createRecipe({
+          title,
+          description,
+          servings,
+          cookTime,
+          ingredients,
+          steps,
+          categories,
+          sourceType: 'url',
+          sourceUrl: url,
+        })
       } catch (err) {
         if (isRedirectError(err)) throw err
         console.error('保存エラー:', err)
@@ -123,7 +121,7 @@ export default function NewRecipePage() {
           >
             ← 戻る
           </button>
-          <h1 className="text-lg font-semibold text-zinc-900">レシピを登録</h1>
+          <h1 className="text-lg font-semibold text-zinc-900">URLからレシピを作成</h1>
         </div>
       </header>
 
@@ -135,35 +133,46 @@ export default function NewRecipePage() {
             </p>
           )}
 
-          {/* 写真 */}
+          {/* URL 入力 */}
           <section className="bg-white rounded-xl border border-zinc-200 p-6 space-y-4">
-            <h2 className="text-base font-semibold text-zinc-900">写真 <span className="ml-1 px-1.5 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-500">任意</span></h2>
-            {uploadError && (
+            <h2 className="text-base font-semibold text-zinc-900">レシピURL</h2>
+            {urlError && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-                {uploadError}
+                {urlError}
               </p>
             )}
-            {imagePreviewUrl ? (
-              <div className="space-y-2">
-                <div className="w-full aspect-video rounded-lg overflow-hidden bg-zinc-100">
-                  <img src={imagePreviewUrl} alt="プレビュー" className="w-full h-full object-cover" />
-                </div>
-                <button type="button" onClick={clearImage} className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
-                  写真を削除
-                </button>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center w-full h-32 rounded-lg border-2 border-dashed border-zinc-300 cursor-pointer hover:border-zinc-400 transition-colors">
-                <span className="text-sm text-zinc-500">タップして写真を選択</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  aria-label="写真を選択"
-                  className="sr-only"
-                  onChange={handleImageChange}
-                />
-              </label>
+            {parseError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                {parseError}
+              </p>
             )}
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://example.com/recipe"
+                className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+              />
+              <button
+                type="button"
+                onClick={handleLoadUrl}
+                disabled={isParsing}
+                className="px-4 py-2 text-sm font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isParsing ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    URL読み取り中...
+                  </>
+                ) : (
+                  'URLから読み込む'
+                )}
+              </button>
+            </div>
           </section>
 
           {/* 基本情報 */}

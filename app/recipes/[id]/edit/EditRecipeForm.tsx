@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { updateRecipe, type IngredientInput, type StepInput } from '../../actions'
+import { createClient } from '../../../utils/supabase/client'
+import { convertImage } from '../../../utils/imageConverter'
 
 type InitialValues = {
   title: string
@@ -13,6 +16,7 @@ type InitialValues = {
   ingredients: IngredientInput[]
   steps: StepInput[]
   categories: string[]
+  imageUrl: string | null
 }
 
 type Props = {
@@ -33,6 +37,34 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
   const [steps, setSteps] = useState<StepInput[]>(initialValues.steps)
   const [categoryInput, setCategoryInput] = useState('')
   const [categories, setCategories] = useState<string[]>(initialValues.categories)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(initialValues.imageUrl)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('ファイルサイズは10MB以下にしてください。')
+      return
+    }
+    setUploadError(null)
+    try {
+      const { convertedFile, previewUrl } = await convertImage(file)
+      setImageFile(convertedFile)
+      setImagePreviewUrl(previewUrl)
+    } catch {
+      setUploadError('画像の変換に失敗しました。もう一度お試しください。')
+    }
+  }
+
+  const clearImage = () => {
+    setImageFile(null)
+    setImagePreviewUrl(null)
+    setExistingImageUrl(null)
+    setUploadError(null)
+  }
 
   const addIngredient = () =>
     setIngredients((prev) => [...prev, { name: '', amount: '', unit: '' }])
@@ -69,7 +101,24 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
     setError(null)
     startTransition(async () => {
       try {
-        await updateRecipe(recipeId, { title, description, servings, cookTime, ingredients, steps, categories })
+        let imageUrl: string | undefined = existingImageUrl ?? undefined
+        if (imageFile) {
+          const supabase = createClient()
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) {
+            setUploadError('セッションが切れました。再ログインしてください。')
+            return
+          }
+          const path = `${user.id}/${crypto.randomUUID()}.jpg`
+          const { error: uploadErr } = await supabase.storage.from('recipe-images').upload(path, imageFile)
+          if (uploadErr) {
+            setUploadError('写真のアップロードに失敗しました。もう一度お試しください。')
+            return
+          }
+          const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
+          imageUrl = publicUrl
+        }
+        await updateRecipe(recipeId, { title, description, servings, cookTime, ingredients, steps, categories, imageUrl })
       } catch (err) {
         if (isRedirectError(err)) throw err
         setError('保存に失敗しました。もう一度お試しください。')
@@ -99,6 +148,46 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
               {error}
             </p>
           )}
+
+          {/* 写真 */}
+          <section className="bg-white rounded-xl border border-zinc-200 p-6 space-y-4">
+            <h2 className="text-base font-semibold text-zinc-900">写真 <span className="ml-1 px-1.5 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-500">任意</span></h2>
+            {uploadError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                {uploadError}
+              </p>
+            )}
+            {imagePreviewUrl ? (
+              <div className="space-y-2">
+                <div className="w-full aspect-video rounded-lg overflow-hidden bg-zinc-100">
+                  <img src={imagePreviewUrl} alt="プレビュー" className="w-full h-full object-cover" />
+                </div>
+                <button type="button" onClick={clearImage} className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
+                  写真を削除
+                </button>
+              </div>
+            ) : existingImageUrl ? (
+              <div className="space-y-2">
+                <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-zinc-100">
+                  <Image src={existingImageUrl} alt="現在の写真" fill className="object-cover" sizes="(max-width: 672px) 100vw, 672px" />
+                </div>
+                <button type="button" onClick={clearImage} className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
+                  写真を削除
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center w-full h-32 rounded-lg border-2 border-dashed border-zinc-300 cursor-pointer hover:border-zinc-400 transition-colors">
+                <span className="text-sm text-zinc-500">タップして写真を選択</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  aria-label="写真を選択"
+                  className="sr-only"
+                  onChange={handleImageChange}
+                />
+              </label>
+            )}
+          </section>
 
           {/* 基本情報 */}
           <section className="bg-white rounded-xl border border-zinc-200 p-6 space-y-4">
