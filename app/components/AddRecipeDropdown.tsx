@@ -43,6 +43,13 @@ export default function AddRecipeDropdown() {
           >
             写真から作成
           </Link>
+          <Link
+            href="/recipes/new/from-url"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-3 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors border-t border-zinc-100"
+          >
+            URLから作成
+          </Link>
         </div>
       )}
     </div>
