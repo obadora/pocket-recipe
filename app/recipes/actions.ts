@@ -24,6 +24,8 @@ export type CreateRecipeInput = {
   steps: StepInput[]
   categories: string[]
   imageUrl?: string
+  sourceType?: 'url' | 'photo' | 'manual'
+  sourceUrl?: string
 }
 
 export async function createRecipe(input: CreateRecipeInput) {
@@ -60,7 +62,8 @@ export async function createRecipe(input: CreateRecipeInput) {
       servings,
       cookTime,
       imageUrl: input.imageUrl ?? null,
-      sourceType: input.imageUrl ? 'photo' : 'manual',
+      sourceType: input.sourceType ?? (input.imageUrl ? 'photo' : 'manual'),
+      sourceUrl: input.sourceUrl ?? null,
       ingredients: {
         create: input.ingredients
           .filter((ing) => ing.name.trim())

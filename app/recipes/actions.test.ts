@@ -254,6 +254,22 @@ describe('createRecipe', () => {
     )
   })
 
+  it('sourceType が url の場合: sourceType が url、sourceUrl が渡される', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
+
+    await createRecipe({ ...baseInput, sourceType: 'url', sourceUrl: 'https://example.com/recipe' })
+
+    expect(mockRecipeCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sourceType: 'url',
+          sourceUrl: 'https://example.com/recipe',
+        }),
+      })
+    )
+  })
+
   it('空文字カテゴリはスキップする', async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: 'user-1' } },
