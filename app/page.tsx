@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { signOut } from './(auth)/actions'
 import { createClient } from './utils/supabase/server'
 import { prisma } from '../lib/prisma'
+import AddRecipeDropdown from './components/AddRecipeDropdown'
 
 export default async function Home() {
   const supabase = await createClient()
@@ -37,12 +38,7 @@ export default async function Home() {
       <main className="max-w-3xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm text-zinc-500">{recipes.length}件のレシピ</p>
-          <Link
-            href="/recipes/new"
-            className="px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition-colors"
-          >
-            + レシピを追加
-          </Link>
+          <AddRecipeDropdown />
         </div>
 
         {recipes.length === 0 ? (
