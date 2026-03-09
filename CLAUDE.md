@@ -10,6 +10,7 @@ npm run build    # Build for production
 npm run lint     # Run ESLint
 npm test         # Run tests (Vitest, single run)
 npm run test:watch  # Run tests in watch mode
+npx vitest run path/to/file.test.ts  # Run a single test file
 
 # Prisma
 npx prisma migrate dev   # Apply migrations and regenerate client
@@ -63,7 +64,19 @@ Tailwind CSS v4 via `@tailwindcss/postcss`. No separate `tailwind.config.js` —
 
 - `app/(auth)/` — Route group for unauthenticated pages (`/login`, `/signup`). Server Actions are in `app/(auth)/actions.ts`.
 - `app/auth/callback/route.ts` — OAuth callback handler (`/auth/callback`). Exchanges code for session and upserts the user into Prisma DB.
+- `app/recipes/` — Recipe list (home). Server Actions in `app/recipes/actions.ts`.
+- `app/recipes/[id]/` — Recipe detail page with `DeleteButton.tsx` component.
+- `app/recipes/[id]/edit/` — Edit recipe form (`EditRecipeForm.tsx`).
+- `app/recipes/new/` — Manual recipe creation.
+- `app/recipes/new/from-photo/` — Recipe creation via photo upload (uses `/api/recipes/parse`).
+- `app/recipes/new/from-url/` — Recipe creation via URL (uses `/api/recipes/parse-url`).
 - All other routes are protected: `middleware.ts` redirects unauthenticated users to `/login`.
+
+### API Routes
+
+- `POST /api/recipes/parse` — Extracts recipe data from an uploaded photo using Claude AI (`app/utils/recipeParser.ts`).
+- `POST /api/recipes/parse-url` — Scrapes and extracts recipe data from a URL using Puppeteer/Chromium (`app/utils/recipeUrlParser.ts`).
+- `POST /api/images/convert` — Converts HEIC images to JPEG (`app/utils/imageConverter.ts`).
 
 ### User Sync Pattern
 

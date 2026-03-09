@@ -19,7 +19,8 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  recipes Recipe[]
+  recipes     Recipe[]
+  mealRecords MealRecord[]
 
   @@map("users")
 }
@@ -42,6 +43,7 @@ model Recipe {
   ingredients Ingredient[]
   steps       Step[]
   categories  RecipeCategory[]
+  mealRecords MealRecord[]
 
   @@map("recipes")
 }
@@ -82,6 +84,20 @@ model Category {
   recipes RecipeCategory[]
 
   @@map("categories")
+}
+
+// 食事記録
+model MealRecord {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  recipeId  String   @map("recipe_id")
+  date      DateTime @map("date") @db.Date
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@map("meal_records")
 }
 
 // レシピ-カテゴリ中間テーブル
