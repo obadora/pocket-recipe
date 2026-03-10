@@ -27,7 +27,15 @@ export default async function CalendarDatePage({ params }: Props) {
     prisma.recipe.findMany({
       where: { userId: user!.id },
       orderBy: { createdAt: 'desc' },
-      include: { categories: { include: { category: true } } },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        servings: true,
+        cookTime: true,
+        imageUrl: true,
+        categories: { include: { category: true } },
+      },
     }),
     prisma.mealRecord.findMany({
       where: {
@@ -42,15 +50,15 @@ export default async function CalendarDatePage({ params }: Props) {
   return (
     <div className="min-h-screen bg-zinc-50">
       <header className="bg-white border-b border-zinc-200">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Link href="/" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
+          <Link href="/?tab=calendar" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
             ← カレンダーへ
           </Link>
           <h1 className="text-lg font-semibold text-zinc-900">{formatDateLabel(date)}</h1>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-8">
         <MealDateClient date={date} recipes={recipes} mealRecords={mealRecords} />
       </main>
     </div>

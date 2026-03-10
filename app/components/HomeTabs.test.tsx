@@ -4,6 +4,9 @@ import userEvent from '@testing-library/user-event'
 
 vi.mock('./CalendarView', () => ({ default: () => <div>CalendarView</div> }))
 vi.mock('./RecipeList', () => ({ default: () => <div>RecipeList</div> }))
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 import HomeTabs from './HomeTabs'
 
