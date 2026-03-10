@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { signOut } from './(auth)/actions'
 import { createClient } from './utils/supabase/server'
 import { prisma } from '../lib/prisma'
@@ -12,7 +13,13 @@ export default async function Home() {
     prisma.recipe.findMany({
       where: { userId: user!.id },
       orderBy: { createdAt: 'desc' },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        servings: true,
+        cookTime: true,
+        imageUrl: true,
         categories: { include: { category: true } },
       },
     }),
@@ -24,9 +31,9 @@ export default async function Home() {
   ])
 
   return (
-    <div className="min-h-screen bg-zinc-50">
+    <div className="min-h-screen flex flex-col bg-zinc-50">
       <header className="bg-white border-b border-zinc-200">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-zinc-900">ぽけっと レシピ</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm text-zinc-500">{user?.email}</span>
@@ -42,13 +49,15 @@ export default async function Home() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8">
+      <main className="max-w-7xl w-full mx-auto px-4 py-8 flex-1 flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm text-zinc-500">{recipes.length}件のレシピ</p>
           <AddRecipeDropdown />
         </div>
 
-        <HomeTabs recipes={recipes} mealRecords={mealRecords} />
+        <Suspense>
+          <HomeTabs recipes={recipes} mealRecords={mealRecords} />
+        </Suspense>
       </main>
     </div>
   )

@@ -129,27 +129,29 @@ export default function CalendarView({ mealRecords, recipes: _recipes, initialMo
   const goToNextMonth = () => setCurrentMonth(new Date(year, month + 1, 1))
 
   return (
-    <div>
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">
         <button
           type="button"
           aria-label="前月"
           onClick={goToPrevMonth}
-          className="px-3 py-1 text-sm text-zinc-600 hover:text-zinc-900"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors cursor-pointer"
         >
-          ← 前月
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          前月
         </button>
-        <span className="font-medium text-zinc-900">
+        <span className="font-semibold text-zinc-900">
           {year}年{month + 1}月
         </span>
         <button
           type="button"
           aria-label="翌月"
           onClick={goToNextMonth}
-          className="px-3 py-1 text-sm text-zinc-600 hover:text-zinc-900"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors cursor-pointer"
         >
-          翌月 →
+          翌月
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
 
@@ -169,7 +171,7 @@ export default function CalendarView({ mealRecords, recipes: _recipes, initialMo
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-px bg-zinc-200 border border-zinc-200 rounded-lg overflow-hidden">
+      <div className="grid grid-cols-7 auto-rows-fr gap-px bg-zinc-200 border border-zinc-200 rounded-lg overflow-hidden flex-1">
         {cells.map((cell) => {
           const dayRecords = cell.isCurrentMonth ? (recordsByDate[cell.dateKey] ?? []) : []
           const dayColor = getDayColor(cell.dayOfWeek, cell.holidayName, cell.isCurrentMonth)
@@ -179,12 +181,8 @@ export default function CalendarView({ mealRecords, recipes: _recipes, initialMo
               key={cell.dateKey}
               type="button"
               data-testid={`cell-${cell.dateKey}`}
-              onClick={() => {
-                if (cell.isCurrentMonth) router.push(`/calendar/${cell.dateKey}`)
-              }}
-              className={`bg-white min-h-16 p-1 flex flex-col items-center transition-colors ${
-                cell.isCurrentMonth ? 'hover:bg-zinc-50' : 'cursor-default'
-              }`}
+              onClick={() => router.push(`/calendar/${cell.dateKey}`)}
+              className="bg-white p-1 flex flex-col items-center transition-colors hover:bg-zinc-50 cursor-pointer"
             >
               <span className={`text-xs mb-0.5 ${dayColor}`}>{cell.day}</span>
               {cell.holidayName && (
