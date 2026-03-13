@@ -4,7 +4,7 @@ import { createClient } from '../utils/supabase/server'
 import { prisma } from '../../lib/prisma'
 import { redirect } from 'next/navigation'
 
-export async function createMealRecord(input: { recipeId: string; date: string }): Promise<void> {
+export async function createMealRecord(input: { recipeId: string; date: string; type?: string; mealTime?: string | null }): Promise<void> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -24,6 +24,8 @@ export async function createMealRecord(input: { recipeId: string; date: string }
       userId: user.id,
       recipeId: input.recipeId,
       date: new Date(input.date),
+      type: input.type ?? 'ate',
+      mealTime: input.mealTime ?? null,
     },
   })
 }

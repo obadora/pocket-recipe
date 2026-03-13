@@ -92,6 +92,8 @@ model MealRecord {
   userId    String   @map("user_id")
   recipeId  String   @map("recipe_id")
   date      DateTime @map("date") @db.Date
+  type      String   @default("ate") // 'ate' | 'cooked'
+  mealTime  String?  @map("meal_time") // 'breakfast' | 'lunch' | 'dinner' | null
   createdAt DateTime @default(now()) @map("created_at")
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
