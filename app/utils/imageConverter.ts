@@ -1,3 +1,23 @@
+function isHeic(file: File): boolean {
+  if (file.type === 'image/heic' || file.type === 'image/heif') return true
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  return ext === 'heic' || ext === 'heif'
+}
+
+export async function prepareImageForCrop(file: File): Promise<string> {
+  if (isHeic(file)) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await fetch('/api/images/convert', { method: 'POST', body: formData })
+    if (!res.ok) {
+      throw new Error('Failed to convert image')
+    }
+    const blob = await res.blob()
+    return URL.createObjectURL(blob)
+  }
+  return URL.createObjectURL(file)
+}
+
 export async function convertImage(file: File): Promise<{ convertedFile: File; previewUrl: string }> {
   const formData = new FormData()
   formData.append('file', file)
