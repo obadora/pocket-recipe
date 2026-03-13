@@ -60,7 +60,7 @@ describe('createMealRecord', () => {
     expect(mockMealRecordCreate).not.toHaveBeenCalled()
   })
 
-  it('成功時: create を正しい引数で呼ぶ', async () => {
+  it('成功時: type/mealTime 未指定はデフォルト値で create を呼ぶ', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
     mockMealRecordCreate.mockResolvedValue({ id: 'meal-1' })
@@ -72,6 +72,44 @@ describe('createMealRecord', () => {
         userId: 'user-1',
         recipeId: 'recipe-1',
         date: new Date('2026-03-01'),
+        type: 'ate',
+        mealTime: null,
+      },
+    })
+  })
+
+  it('type=ate, mealTime=lunch で create を呼ぶ', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+    mockMealRecordCreate.mockResolvedValue({ id: 'meal-1' })
+
+    await createMealRecord({ recipeId: 'recipe-1', date: '2026-03-01', type: 'ate', mealTime: 'lunch' })
+
+    expect(mockMealRecordCreate).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-1',
+        recipeId: 'recipe-1',
+        date: new Date('2026-03-01'),
+        type: 'ate',
+        mealTime: 'lunch',
+      },
+    })
+  })
+
+  it('type=cooked で create を呼ぶ', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+    mockMealRecordCreate.mockResolvedValue({ id: 'meal-1' })
+
+    await createMealRecord({ recipeId: 'recipe-1', date: '2026-03-01', type: 'cooked' })
+
+    expect(mockMealRecordCreate).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-1',
+        recipeId: 'recipe-1',
+        date: new Date('2026-03-01'),
+        type: 'cooked',
+        mealTime: null,
       },
     })
   })
