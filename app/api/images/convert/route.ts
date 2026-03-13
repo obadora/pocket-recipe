@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import sharp from 'sharp'
 import heicConvert from 'heic-convert'
 
 const HEIC_TYPES = ['image/heic', 'image/heif']
@@ -20,19 +19,14 @@ export async function POST(req: NextRequest) {
       const converted = await heicConvert({
         buffer: new Uint8Array(arrayBuffer) as unknown as ArrayBuffer,
         format: 'JPEG',
-        quality: 1,
+        quality: 0.7,
       })
       buffer = Buffer.from(converted)
     } else {
       buffer = Buffer.from(arrayBuffer)
     }
 
-    const jpegBuffer = await sharp(buffer)
-      .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 70 })
-      .toBuffer()
-
-    return new NextResponse(new Uint8Array(jpegBuffer), {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: { 'Content-Type': 'image/jpeg' },
     })
