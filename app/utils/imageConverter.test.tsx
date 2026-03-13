@@ -17,40 +17,22 @@ function makeJpegResponse() {
   return Promise.resolve(new Response(blob, { status: 200 }))
 }
 
-describe('convertImage', () => {
+describe('convertImage (component env)', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('/api/images/convert に FormData を POST する', async () => {
+  it('/api/images/convert に POST して File と blob URL を返す', async () => {
     mockFetch.mockReturnValue(makeJpegResponse())
 
     const file = new File(['heic-data'], 'photo.HEIC', { type: 'image/heic' })
-    await convertImage(file)
+    const { convertedFile, previewUrl } = await convertImage(file)
 
     expect(mockFetch).toHaveBeenCalledWith(
       '/api/images/convert',
       expect.objectContaining({ method: 'POST' })
     )
-  })
-
-  it('変換済み File と blob URL を返す', async () => {
-    mockFetch.mockReturnValue(makeJpegResponse())
-
-    const file = new File(['data'], 'photo.HEIC', { type: 'image/heic' })
-    const { convertedFile, previewUrl } = await convertImage(file)
-
     expect(convertedFile.name).toBe('photo.jpg')
     expect(convertedFile.type).toBe('image/jpeg')
     expect(previewUrl).toBe('blob:converted')
-  })
-
-  it('PNG も変換される', async () => {
-    mockFetch.mockReturnValue(makeJpegResponse())
-
-    const file = new File(['data'], 'photo.png', { type: 'image/png' })
-    const { convertedFile } = await convertImage(file)
-
-    expect(convertedFile.type).toBe('image/jpeg')
-    expect(convertedFile.name).toBe('photo.jpg')
   })
 
   it('API が 500 を返した場合はエラーを throw する', async () => {
