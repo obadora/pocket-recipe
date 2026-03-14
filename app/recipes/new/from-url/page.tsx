@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { createRecipe, type IngredientInput, type StepInput } from '../../actions'
 import { parseRecipeFromUrl } from '../../../utils/recipeUrlParser'
 
-export default function FromUrlPage() {
+function FromUrlPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const from = searchParams.get('from') ?? undefined
@@ -375,5 +375,13 @@ export default function FromUrlPage() {
         </form>
       </main>
     </div>
+  )
+}
+
+export default function FromUrlPage() {
+  return (
+    <Suspense>
+      <FromUrlPageInner />
+    </Suspense>
   )
 }

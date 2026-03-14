@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, Suspense } from 'react'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
@@ -8,7 +8,7 @@ import { createRecipe, type IngredientInput, type StepInput } from '../actions'
 import { createClient } from '../../utils/supabase/client'
 import { convertImage } from '../../utils/imageConverter'
 
-export default function NewRecipePage() {
+function NewRecipePageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const from = searchParams.get('from') ?? undefined
@@ -342,5 +342,13 @@ export default function NewRecipePage() {
         </form>
       </main>
     </div>
+  )
+}
+
+export default function NewRecipePage() {
+  return (
+    <Suspense>
+      <NewRecipePageInner />
+    </Suspense>
   )
 }

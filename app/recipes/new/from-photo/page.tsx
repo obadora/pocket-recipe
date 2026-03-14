@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef, useCallback } from 'react'
+import { useState, useTransition, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import ReactCrop, { type Crop, centerCrop, makeAspectCrop } from 'react-image-crop'
@@ -54,7 +54,7 @@ async function cropAndConvert(
   })
 }
 
-export default function FromPhotoPage() {
+function FromPhotoPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const from = searchParams.get('from') ?? undefined
@@ -509,5 +509,13 @@ export default function FromPhotoPage() {
         </form>
       </main>
     </div>
+  )
+}
+
+export default function FromPhotoPage() {
+  return (
+    <Suspense>
+      <FromPhotoPageInner />
+    </Suspense>
   )
 }
