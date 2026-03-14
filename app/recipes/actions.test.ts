@@ -18,6 +18,7 @@ const {
   mockStorageRemove,
   mockStorageUpload,
   mockStorageGetPublicUrl,
+  mockMealRecordCreate,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockRecipeCreate: vi.fn(),
@@ -36,6 +37,7 @@ const {
   mockStorageRemove: vi.fn(),
   mockStorageUpload: vi.fn(),
   mockStorageGetPublicUrl: vi.fn(),
+  mockMealRecordCreate: vi.fn(),
 }))
 
 vi.mock('../utils/supabase/server', () => ({
@@ -58,6 +60,7 @@ vi.mock('../../lib/prisma', () => ({
     ingredient: { deleteMany: mockIngredientDeleteMany, createMany: mockIngredientCreateMany },
     step: { deleteMany: mockStepDeleteMany, createMany: mockStepCreateMany },
     recipeCategory: { deleteMany: mockRecipeCategoryDeleteMany, createMany: mockRecipeCategoryCreateMany },
+    mealRecord: { create: mockMealRecordCreate },
     $transaction: mockTransaction,
   },
 }))
@@ -331,6 +334,55 @@ describe('createRecipe', () => {
     expect(mockCategoryUpsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { name: '和食' } })
     )
+  })
+
+  it('from が /calendar/YYYY-MM-DD パターンの場合: MealRecord(cooked)を作成してそのパスにリダイレクトする', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
+    mockMealRecordCreate.mockResolvedValue({})
+
+    await createRecipe(baseInput, '/calendar/2026-03-14')
+
+    expect(mockMealRecordCreate).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-1',
+        recipeId: 'recipe-abc',
+        date: new Date('2026-03-14'),
+        type: 'cooked',
+        mealTime: null,
+      },
+    })
+    expect(mockRedirect).toHaveBeenCalledWith('/calendar/2026-03-14')
+  })
+
+  it('from が undefined の場合: MealRecordを作成せず / にリダイレクトする', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
+
+    await createRecipe(baseInput, undefined)
+
+    expect(mockMealRecordCreate).not.toHaveBeenCalled()
+    expect(mockRedirect).toHaveBeenCalledWith('/')
+  })
+
+  it('from が https://evil.com の場合: MealRecordを作成せず / にリダイレクトする（オープンリダイレクト防止）', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
+
+    await createRecipe(baseInput, 'https://evil.com')
+
+    expect(mockMealRecordCreate).not.toHaveBeenCalled()
+    expect(mockRedirect).toHaveBeenCalledWith('/')
+  })
+
+  it('from が /recipes の場合: MealRecordを作成せず / にリダイレクトする（不正パス）', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
+
+    await createRecipe(baseInput, '/recipes')
+
+    expect(mockMealRecordCreate).not.toHaveBeenCalled()
+    expect(mockRedirect).toHaveBeenCalledWith('/')
   })
 })
 

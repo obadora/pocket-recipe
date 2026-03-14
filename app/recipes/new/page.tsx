@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { createRecipe, type IngredientInput, type StepInput } from '../actions'
 import { createClient } from '../../utils/supabase/client'
@@ -10,6 +10,8 @@ import { convertImage } from '../../utils/imageConverter'
 
 export default function NewRecipePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const from = searchParams.get('from') ?? undefined
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -103,7 +105,7 @@ export default function NewRecipePage() {
           const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
           imageUrl = publicUrl
         }
-        await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories, imageUrl })
+        await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories, imageUrl }, from)
       } catch (err) {
         if (isRedirectError(err)) throw err
         console.error('保存エラー:', err)

@@ -181,4 +181,22 @@ describe('MealDateClient', () => {
     render(<MealDateClient {...defaultProps} mealRecords={[makeMealRecord('m1', 'r1', '肉じゃが', 'ate', null)]} />)
     expect(screen.getByText('食べた')).toBeInTheDocument()
   })
+
+  it('レシピ作成リンク: 手動で作成のhrefが正しい', () => {
+    render(<MealDateClient {...defaultProps} />)
+    const link = screen.getByRole('link', { name: '手動で作成' })
+    expect(link).toHaveAttribute('href', `/recipes/new?from=/calendar/${defaultProps.date}`)
+  })
+
+  it('レシピ作成リンク: URLから作成のhrefが正しい', () => {
+    render(<MealDateClient {...defaultProps} />)
+    const link = screen.getByRole('link', { name: 'URLから作成' })
+    expect(link).toHaveAttribute('href', `/recipes/new/from-url?from=/calendar/${defaultProps.date}`)
+  })
+
+  it('レシピ作成リンク: 写真から作成のhrefが正しい', () => {
+    render(<MealDateClient {...defaultProps} />)
+    const link = screen.getByRole('link', { name: '写真から作成' })
+    expect(link).toHaveAttribute('href', `/recipes/new/from-photo?from=/calendar/${defaultProps.date}`)
+  })
 })

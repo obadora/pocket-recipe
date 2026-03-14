@@ -30,7 +30,9 @@ export type CreateRecipeInput = {
   sourceUrl?: string
 }
 
-export async function createRecipe(input: CreateRecipeInput) {
+const calendarPattern = /^\/calendar\/(\d{4}-\d{2}-\d{2})$/
+
+export async function createRecipe(input: CreateRecipeInput, from?: string) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -119,6 +121,21 @@ export async function createRecipe(input: CreateRecipeInput) {
       },
     },
   })
+
+  const calendarMatch = from ? calendarPattern.exec(from) : null
+  if (calendarMatch) {
+    const dateStr = calendarMatch[1]
+    await prisma.mealRecord.create({
+      data: {
+        userId: user.id,
+        recipeId: recipe.id,
+        date: new Date(dateStr),
+        type: 'cooked',
+        mealTime: null,
+      },
+    })
+    redirect(from!)
+  }
 
   redirect('/')
 }

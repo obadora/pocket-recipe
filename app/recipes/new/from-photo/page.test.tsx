@@ -3,11 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ParsedRecipe } from '../../../types/recipe'
 
-const { mockParseRecipe, mockCreateRecipe, mockRouterBack, mockPrepareImageForCrop } = vi.hoisted(() => ({
+const { mockParseRecipe, mockCreateRecipe, mockRouterBack, mockPrepareImageForCrop, mockSearchParamsGet } = vi.hoisted(() => ({
   mockParseRecipe: vi.fn(),
   mockCreateRecipe: vi.fn(),
   mockRouterBack: vi.fn(),
   mockPrepareImageForCrop: vi.fn(),
+  mockSearchParamsGet: vi.fn().mockReturnValue(null),
 }))
 
 vi.mock('../../../utils/recipeParser', () => ({
@@ -20,6 +21,7 @@ vi.mock('../../actions', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ back: mockRouterBack }),
+  useSearchParams: () => ({ get: mockSearchParamsGet }),
 }))
 
 vi.mock('../../../utils/imageConverter', () => ({
@@ -199,5 +201,43 @@ describe('FromPhotoPage', () => {
     await user.type(titleInput, '編集後タイトル')
 
     expect(screen.getByDisplayValue('編集後タイトル')).toBeInTheDocument()
+  })
+
+  it('from パラメータがある場合: createRecipe の第2引数に渡される', async () => {
+    const user = userEvent.setup()
+    mockSearchParamsGet.mockReturnValue('/calendar/2026-03-14')
+    mockCreateRecipe.mockResolvedValue(undefined)
+    render(<FromPhotoPage />)
+
+    const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
+    await uploadAndConfirmCrop(user, file)
+    await waitFor(() => screen.getByDisplayValue('カレーライス'))
+    await user.click(screen.getByRole('button', { name: 'レシピを保存' }))
+
+    await waitFor(() => {
+      expect(mockCreateRecipe).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'カレーライス' }),
+        '/calendar/2026-03-14'
+      )
+    })
+  })
+
+  it('from パラメータがない場合: createRecipe の第2引数は undefined', async () => {
+    const user = userEvent.setup()
+    mockSearchParamsGet.mockReturnValue(null)
+    mockCreateRecipe.mockResolvedValue(undefined)
+    render(<FromPhotoPage />)
+
+    const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
+    await uploadAndConfirmCrop(user, file)
+    await waitFor(() => screen.getByDisplayValue('カレーライス'))
+    await user.click(screen.getByRole('button', { name: 'レシピを保存' }))
+
+    await waitFor(() => {
+      expect(mockCreateRecipe).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'カレーライス' }),
+        undefined
+      )
+    })
   })
 })
