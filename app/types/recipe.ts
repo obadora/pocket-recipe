@@ -11,4 +11,5 @@ export type ParsedRecipe = {
   cookTime: number | null
   ingredients: ParsedIngredient[]
   steps: string[]
+  imageUrl: string | null
 }

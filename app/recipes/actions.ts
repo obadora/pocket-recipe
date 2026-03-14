@@ -4,6 +4,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '../utils/supabase/server'
 import { prisma } from '../../lib/prisma'
+import sharp from 'sharp'
+import { randomUUID } from 'crypto'
 
 export type IngredientInput = {
   name: string
@@ -42,6 +44,32 @@ export async function createRecipe(input: CreateRecipeInput) {
   const servings = input.servings ? parseInt(input.servings, 10) : null
   const cookTime = input.cookTime ? parseInt(input.cookTime, 10) : null
 
+  // 外部URLの画像をバケットに保存
+  let resolvedImageUrl = input.imageUrl ?? null
+  if (input.imageUrl && !input.imageUrl.includes(process.env.NEXT_PUBLIC_SUPABASE_URL!)) {
+    try {
+      const res = await fetch(input.imageUrl, { signal: AbortSignal.timeout(10000) })
+      if (res.ok) {
+        const arrayBuffer = await res.arrayBuffer()
+        const resized = await sharp(Buffer.from(arrayBuffer))
+          .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 80 })
+          .toBuffer()
+        const filePath = `url-imports/${randomUUID()}.jpg`
+        const { error } = await supabase.storage
+          .from('recipe-images')
+          .upload(filePath, resized, { contentType: 'image/jpeg', upsert: false })
+        if (!error) {
+          const { data } = supabase.storage.from('recipe-images').getPublicUrl(filePath)
+          resolvedImageUrl = data.publicUrl
+        }
+      }
+    } catch {
+      // 画像保存失敗時は null にする
+      resolvedImageUrl = null
+    }
+  }
+
   const categoryIds: string[] = []
   for (const name of input.categories) {
     const trimmed = name.trim()
@@ -61,16 +89,16 @@ export async function createRecipe(input: CreateRecipeInput) {
       description: input.description || null,
       servings,
       cookTime,
-      imageUrl: input.imageUrl ?? null,
-      sourceType: input.sourceType ?? (input.imageUrl ? 'photo' : 'manual'),
+      imageUrl: resolvedImageUrl,
+      sourceType: input.sourceType ?? (resolvedImageUrl ? 'photo' : 'manual'),
       sourceUrl: input.sourceUrl ?? null,
       ingredients: {
         create: input.ingredients
           .filter((ing) => ing.name.trim())
           .map((ing, index) => ({
             name: ing.name.trim(),
-            amount: ing.amount.trim() || null,
-            unit: ing.unit.trim() || null,
+            amount: String(ing.amount).trim() || null,
+            unit: String(ing.unit).trim() || null,
             order: index,
           })),
       },
