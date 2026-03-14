@@ -109,7 +109,7 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
             setUploadError('セッションが切れました。再ログインしてください。')
             return
           }
-          const path = `${user.id}/${crypto.randomUUID()}.jpg`
+          const path = `photos/${user.id}/${crypto.randomUUID()}.jpg`
           const { error: uploadErr } = await supabase.storage.from('recipe-images').upload(path, imageFile)
           if (uploadErr) {
             setUploadError('写真のアップロードに失敗しました。もう一度お試しください。')

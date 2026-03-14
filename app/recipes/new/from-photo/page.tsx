@@ -1,15 +1,63 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useTransition, useRef, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
+import ReactCrop, { type Crop, centerCrop, makeAspectCrop } from 'react-image-crop'
+import 'react-image-crop/dist/ReactCrop.css'
 import { createRecipe, type IngredientInput, type StepInput } from '../../actions'
 import { createClient } from '../../../utils/supabase/client'
-import { convertImage } from '../../../utils/imageConverter'
+import { prepareImageForCrop } from '../../../utils/imageConverter'
 import { parseRecipeFromImage } from '../../../utils/recipeParser'
 
-export default function FromPhotoPage() {
+async function cropAndConvert(
+  imgElement: HTMLImageElement,
+  crop: Crop,
+  maxSize = 1024
+): Promise<File> {
+  const naturalW = imgElement.naturalWidth || imgElement.width || 100
+  const naturalH = imgElement.naturalHeight || imgElement.height || 100
+  const displayW = imgElement.width || naturalW
+  const displayH = imgElement.height || naturalH
+  const scaleX = naturalW / displayW
+  const scaleY = naturalH / displayH
+
+  const isPercent = crop.unit === '%'
+  const cropX = isPercent ? (crop.x / 100) * naturalW : crop.x * scaleX
+  const cropY = isPercent ? (crop.y / 100) * naturalH : crop.y * scaleY
+  const cropWidth = isPercent ? (crop.width / 100) * naturalW : crop.width * scaleX
+  const cropHeight = isPercent ? (crop.height / 100) * naturalH : crop.height * scaleY
+
+  const outputWidth = Math.min(cropWidth || naturalW, maxSize)
+  const outputHeight = cropWidth
+    ? Math.min(cropHeight, maxSize * (cropHeight / cropWidth))
+    : Math.min(naturalH, maxSize)
+
+  const canvas = document.createElement('canvas')
+  canvas.width = outputWidth
+  canvas.height = outputHeight
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas context unavailable')
+
+  ctx.drawImage(imgElement, cropX, cropY, cropWidth, cropHeight, 0, 0, outputWidth, outputHeight)
+
+  return new Promise<File>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) { reject(new Error('Canvas toBlob failed')); return }
+        resolve(new File([blob], 'recipe.jpg', { type: 'image/jpeg' }))
+      },
+      'image/jpeg',
+      0.7
+    )
+  })
+}
+
+function FromPhotoPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const from = searchParams.get('from') ?? undefined
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -29,6 +77,11 @@ export default function FromPhotoPage() {
   const [isParsing, setIsParsing] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
 
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const [crop, setCrop] = useState<Crop>()
+  const [isConverting, setIsConverting] = useState(false)
+  const imgRef = useRef<HTMLImageElement>(null)
+
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -38,19 +91,40 @@ export default function FromPhotoPage() {
     }
     setUploadError(null)
     setParseError(null)
-    let convertedFile: File
+    setIsConverting(true)
     try {
-      const result = await convertImage(file)
-      convertedFile = result.convertedFile
-      setImageFile(convertedFile)
-      setImagePreviewUrl(result.previewUrl)
+      const url = await prepareImageForCrop(file)
+      setCropSrc(url)
+      setCrop(undefined)
     } catch {
       setUploadError('画像の変換に失敗しました。もう一度お試しください。')
-      return
+    } finally {
+      setIsConverting(false)
     }
+  }
+
+  const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { width, height } = e.currentTarget
+    const initialCrop = centerCrop(
+      makeAspectCrop({ unit: '%', width: 90 }, width / height, width, height),
+      width,
+      height
+    )
+    setCrop(initialCrop)
+  }, [])
+
+  const handleCropConfirm = async () => {
+    if (!imgRef.current || !cropSrc) return
+    // If no crop selected, use full image
+    const activeCrop: Crop = crop ?? { unit: '%', x: 0, y: 0, width: 100, height: 100 }
     setIsParsing(true)
+    setCropSrc(null)
     try {
-      const parsed = await parseRecipeFromImage(convertedFile)
+      const file = await cropAndConvert(imgRef.current, activeCrop)
+      setImageFile(file)
+      const previewUrl = URL.createObjectURL(file)
+      setImagePreviewUrl(previewUrl)
+      const parsed = await parseRecipeFromImage(file)
       if (parsed.title !== null) setTitle(parsed.title)
       if (parsed.description !== null) setDescription(parsed.description)
       if (parsed.servings !== null) setServings(String(parsed.servings))
@@ -67,6 +141,8 @@ export default function FromPhotoPage() {
   const clearImage = () => {
     setImageFile(null)
     setImagePreviewUrl(null)
+    setCropSrc(null)
+    setCrop(undefined)
     setUploadError(null)
     setParseError(null)
   }
@@ -114,7 +190,7 @@ export default function FromPhotoPage() {
             setUploadError('セッションが切れました。再ログインしてください。')
             return
           }
-          const path = `${user.id}/${crypto.randomUUID()}.jpg`
+          const path = `photos/${user.id}/${crypto.randomUUID()}.jpg`
           const { error: uploadErr } = await supabase.storage.from('recipe-images').upload(path, imageFile)
           if (uploadErr) {
             console.error('Storageアップロードエラー:', uploadErr)
@@ -124,7 +200,7 @@ export default function FromPhotoPage() {
           const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
           imageUrl = publicUrl
         }
-        await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories, imageUrl })
+        await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories, imageUrl }, from)
       } catch (err) {
         if (isRedirectError(err)) throw err
         console.error('保存エラー:', err)
@@ -164,7 +240,58 @@ export default function FromPhotoPage() {
                 {uploadError}
               </p>
             )}
-            {imagePreviewUrl ? (
+
+            {/* HEIC変換中 */}
+            {isConverting && (
+              <div className="flex items-center justify-center gap-2 text-sm text-zinc-500 py-8">
+                <svg className="animate-spin h-4 w-4 text-zinc-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                画像を変換中...
+              </div>
+            )}
+
+            {/* クロップUI */}
+            {cropSrc && !isConverting && (
+              <div className="space-y-3">
+                <p className="text-sm text-zinc-500">レシピ部分をドラッグで選択してください</p>
+                <div className="w-full overflow-hidden rounded-lg bg-zinc-100">
+                  <ReactCrop
+                    crop={crop}
+                    onChange={(c) => setCrop(c)}
+                    className="w-full"
+                  >
+                    <img
+                      ref={imgRef}
+                      src={cropSrc}
+                      alt="クロップ"
+                      className="w-full"
+                      onLoad={onImageLoad}
+                    />
+                  </ReactCrop>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCropConfirm}
+                    className="flex-1 py-2.5 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition-colors"
+                  >
+                    この範囲で決定
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearImage}
+                    className="px-4 py-2.5 rounded-lg border border-zinc-300 text-sm text-zinc-600 hover:bg-zinc-50 transition-colors"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* プレビュー（クロップ確定後） */}
+            {imagePreviewUrl && !cropSrc && (
               <div className="space-y-3">
                 <div className="w-full aspect-video rounded-lg overflow-hidden bg-zinc-100">
                   <img src={imagePreviewUrl} alt="プレビュー" className="w-full h-full object-cover" />
@@ -191,7 +318,10 @@ export default function FromPhotoPage() {
                   写真を削除
                 </button>
               </div>
-            ) : (
+            )}
+
+            {/* ファイル選択UI */}
+            {!cropSrc && !imagePreviewUrl && !isConverting && (
               <label className="flex flex-col items-center justify-center w-full h-32 rounded-lg border-2 border-dashed border-zinc-300 cursor-pointer hover:border-zinc-400 transition-colors">
                 <span className="text-sm text-zinc-500">タップして写真を選択</span>
                 <input
@@ -379,5 +509,13 @@ export default function FromPhotoPage() {
         </form>
       </main>
     </div>
+  )
+}
+
+export default function FromPhotoPage() {
+  return (
+    <Suspense>
+      <FromPhotoPageInner />
+    </Suspense>
   )
 }

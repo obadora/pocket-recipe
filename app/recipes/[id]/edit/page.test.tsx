@@ -69,7 +69,7 @@ describe('EditRecipeForm', () => {
     render(
       <EditRecipeForm
         recipeId="recipe-1"
-        initialValues={{ ...defaultInitialValues, imageUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/user-1/photo.jpg' }}
+        initialValues={{ ...defaultInitialValues, imageUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/photo.jpg' }}
       />
     )
 
@@ -90,8 +90,8 @@ describe('EditRecipeForm', () => {
 
   it('写真付きで送信すると storage.upload が呼ばれ updateRecipe に imageUrl が渡される', async () => {
     const user = userEvent.setup()
-    mockSupabaseUpload.mockResolvedValue({ data: { path: 'user-1/uuid.jpg' }, error: null })
-    mockSupabaseGetPublicUrl.mockReturnValue({ data: { publicUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/user-1/uuid.jpg' } })
+    mockSupabaseUpload.mockResolvedValue({ data: { path: 'photos/user-1/uuid.jpg' }, error: null })
+    mockSupabaseGetPublicUrl.mockReturnValue({ data: { publicUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/uuid.jpg' } })
     mockUpdateRecipe.mockResolvedValue(undefined)
     render(<EditRecipeForm recipeId="recipe-1" initialValues={defaultInitialValues} />)
 
@@ -103,7 +103,7 @@ describe('EditRecipeForm', () => {
       expect(mockSupabaseUpload).toHaveBeenCalled()
       expect(mockUpdateRecipe).toHaveBeenCalledWith(
         'recipe-1',
-        expect.objectContaining({ imageUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/user-1/uuid.jpg' })
+        expect.objectContaining({ imageUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/uuid.jpg' })
       )
     })
   })

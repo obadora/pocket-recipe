@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockFetch } = vi.hoisted(() => ({
-  mockFetch: vi.fn(),
+const { mockHeicTo } = vi.hoisted(() => ({
+  mockHeicTo: vi.fn(),
 }))
 
-vi.stubGlobal('fetch', mockFetch)
+vi.mock('heic-to', () => ({ heicTo: mockHeicTo }))
+
 vi.stubGlobal('URL', {
   createObjectURL: vi.fn().mockReturnValue('blob:converted'),
   revokeObjectURL: vi.fn(),
@@ -12,51 +13,31 @@ vi.stubGlobal('URL', {
 
 import { convertImage } from './imageConverter'
 
-function makeJpegResponse() {
-  const blob = new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' })
-  return Promise.resolve(new Response(blob, { status: 200 }))
-}
-
-describe('convertImage', () => {
-  beforeEach(() => vi.clearAllMocks())
-
-  it('/api/images/convert に FormData を POST する', async () => {
-    mockFetch.mockReturnValue(makeJpegResponse())
-
-    const file = new File(['heic-data'], 'photo.HEIC', { type: 'image/heic' })
-    await convertImage(file)
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/images/convert',
-      expect.objectContaining({ method: 'POST' })
-    )
+describe('convertImage (component env)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    ;(URL.createObjectURL as ReturnType<typeof vi.fn>).mockReturnValue('blob:converted')
   })
 
-  it('変換済み File と blob URL を返す', async () => {
-    mockFetch.mockReturnValue(makeJpegResponse())
+  it('HEIC を heicTo で変換して File と blob URL を返す', async () => {
+    const convertedBlob = new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' })
+    mockHeicTo.mockResolvedValue(convertedBlob)
 
-    const file = new File(['data'], 'photo.HEIC', { type: 'image/heic' })
+    const file = new File(['heic-data'], 'photo.HEIC', { type: 'image/heic' })
     const { convertedFile, previewUrl } = await convertImage(file)
 
+    expect(mockHeicTo).toHaveBeenCalledWith(
+      expect.objectContaining({ blob: file, type: 'image/jpeg' })
+    )
     expect(convertedFile.name).toBe('photo.jpg')
     expect(convertedFile.type).toBe('image/jpeg')
     expect(previewUrl).toBe('blob:converted')
   })
 
-  it('PNG も変換される', async () => {
-    mockFetch.mockReturnValue(makeJpegResponse())
+  it('heicTo が失敗した場合はエラーを throw する', async () => {
+    mockHeicTo.mockRejectedValue(new Error('conversion failed'))
 
-    const file = new File(['data'], 'photo.png', { type: 'image/png' })
-    const { convertedFile } = await convertImage(file)
-
-    expect(convertedFile.type).toBe('image/jpeg')
-    expect(convertedFile.name).toBe('photo.jpg')
-  })
-
-  it('API が 500 を返した場合はエラーを throw する', async () => {
-    mockFetch.mockResolvedValue(new Response(null, { status: 500 }))
-
-    const file = new File(['data'], 'photo.jpg', { type: 'image/jpeg' })
-    await expect(convertImage(file)).rejects.toThrow('Failed to convert image')
+    const file = new File(['data'], 'photo.heic', { type: 'image/heic' })
+    await expect(convertImage(file)).rejects.toThrow('conversion failed')
   })
 })

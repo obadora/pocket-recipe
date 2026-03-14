@@ -3,11 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ParsedRecipe } from '../../../types/recipe'
 
-const { mockParseRecipe, mockCreateRecipe, mockRouterBack, mockConvertImage } = vi.hoisted(() => ({
+const { mockParseRecipe, mockCreateRecipe, mockRouterBack, mockPrepareImageForCrop, mockSearchParamsGet } = vi.hoisted(() => ({
   mockParseRecipe: vi.fn(),
   mockCreateRecipe: vi.fn(),
   mockRouterBack: vi.fn(),
-  mockConvertImage: vi.fn(),
+  mockPrepareImageForCrop: vi.fn(),
+  mockSearchParamsGet: vi.fn().mockReturnValue(null),
 }))
 
 vi.mock('../../../utils/recipeParser', () => ({
@@ -20,10 +21,11 @@ vi.mock('../../actions', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ back: mockRouterBack }),
+  useSearchParams: () => ({ get: mockSearchParamsGet }),
 }))
 
 vi.mock('../../../utils/imageConverter', () => ({
-  convertImage: mockConvertImage,
+  prepareImageForCrop: mockPrepareImageForCrop,
 }))
 
 vi.mock('../../../utils/supabase/client', () => ({
@@ -38,6 +40,33 @@ vi.mock('../../../utils/supabase/client', () => ({
   }),
 }))
 
+// Mock react-image-crop to render a simple img wrapper
+vi.mock('react-image-crop', async () => {
+  const React = await import('react')
+  return {
+    default: ({ children }: { children: React.ReactNode }) => React.createElement('div', { 'data-testid': 'react-crop' }, children),
+    centerCrop: vi.fn((c) => c),
+    makeAspectCrop: vi.fn(() => ({ unit: '%', width: 90, x: 0, y: 0, height: 90 })),
+  }
+})
+
+// Mock canvas toBlob and getContext
+Object.defineProperty(HTMLCanvasElement.prototype, 'toBlob', {
+  value: function (cb: (b: Blob | null) => void) {
+    cb(new Blob(['img'], { type: 'image/jpeg' }))
+  },
+})
+
+Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+  value: () => ({
+    drawImage: vi.fn(),
+  }),
+})
+
+// Mock HTMLImageElement natural dimensions
+Object.defineProperty(HTMLImageElement.prototype, 'naturalWidth', { get: () => 100 })
+Object.defineProperty(HTMLImageElement.prototype, 'naturalHeight', { get: () => 100 })
+
 import FromPhotoPage from './page'
 
 const validRecipe: ParsedRecipe = {
@@ -49,22 +78,26 @@ const validRecipe: ParsedRecipe = {
   steps: ['玉ねぎを炒める', 'カレールーを加える'],
 }
 
+// Helper: upload a file and confirm the crop
+async function uploadAndConfirmCrop(user: ReturnType<typeof userEvent.setup>, file: File) {
+  await user.upload(screen.getByLabelText('写真を選択'), file)
+  await waitFor(() => expect(screen.getByText('この範囲で決定')).toBeInTheDocument())
+  await user.click(screen.getByText('この範囲で決定'))
+}
+
 describe('FromPhotoPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockConvertImage.mockImplementation((file: File) =>
-      Promise.resolve({ convertedFile: file, previewUrl: 'blob:mock' })
-    )
+    mockPrepareImageForCrop.mockResolvedValue('blob:mock')
     mockParseRecipe.mockResolvedValue(validRecipe)
   })
 
   it('初期表示では写真アップロードエリアのみ表示', () => {
     render(<FromPhotoPage />)
-
     expect(screen.getByText('タップして写真を選択')).toBeInTheDocument()
   })
 
-  it('画像選択後にプレビューが表示される', async () => {
+  it('画像選択後にクロップUIが表示される', async () => {
     const user = userEvent.setup()
     render(<FromPhotoPage />)
 
@@ -72,16 +105,28 @@ describe('FromPhotoPage', () => {
     await user.upload(screen.getByLabelText('写真を選択'), file)
 
     await waitFor(() => {
-      expect(screen.getByRole('img', { name: 'プレビュー' })).toBeInTheDocument()
+      expect(screen.getByText('この範囲で決定')).toBeInTheDocument()
     })
   })
 
-  it('画像選択後に自動で parseRecipeFromImage が呼ばれ、フォームに自動入力される', async () => {
+  it('クロップ確定後にプレビューが表示される', async () => {
     const user = userEvent.setup()
     render(<FromPhotoPage />)
 
     const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
-    await user.upload(screen.getByLabelText('写真を選択'), file)
+    await uploadAndConfirmCrop(user, file)
+
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: 'プレビュー' })).toBeInTheDocument()
+    })
+  })
+
+  it('クロップ確定後に自動で parseRecipeFromImage が呼ばれ、フォームに自動入力される', async () => {
+    const user = userEvent.setup()
+    render(<FromPhotoPage />)
+
+    const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
+    await uploadAndConfirmCrop(user, file)
 
     await waitFor(() => {
       expect(mockParseRecipe).toHaveBeenCalled()
@@ -92,14 +137,14 @@ describe('FromPhotoPage', () => {
     })
   })
 
-  it('解析中は "AI解析中..." が表示される', async () => {
+  it('解析中は "画像読み取り中・・・" が表示される', async () => {
     const user = userEvent.setup()
     let resolvePromise!: (v: ParsedRecipe) => void
     mockParseRecipe.mockReturnValue(new Promise<ParsedRecipe>((resolve) => { resolvePromise = resolve }))
     render(<FromPhotoPage />)
 
     const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
-    await user.upload(screen.getByLabelText('写真を選択'), file)
+    await uploadAndConfirmCrop(user, file)
 
     await waitFor(() => {
       expect(screen.getByText('画像読み取り中・・・')).toBeInTheDocument()
@@ -114,7 +159,7 @@ describe('FromPhotoPage', () => {
     render(<FromPhotoPage />)
 
     const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
-    await user.upload(screen.getByLabelText('写真を選択'), file)
+    await uploadAndConfirmCrop(user, file)
 
     await waitFor(() => {
       expect(screen.getByText(/解析に失敗しました/)).toBeInTheDocument()
@@ -137,7 +182,7 @@ describe('FromPhotoPage', () => {
     await user.type(screen.getByPlaceholderText('例: 肉じゃが'), '手動タイトル')
 
     const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
-    await user.upload(screen.getByLabelText('写真を選択'), file)
+    await uploadAndConfirmCrop(user, file)
 
     await waitFor(() => expect(mockParseRecipe).toHaveBeenCalled())
     expect(screen.getByDisplayValue('手動タイトル')).toBeInTheDocument()
@@ -148,7 +193,7 @@ describe('FromPhotoPage', () => {
     render(<FromPhotoPage />)
 
     const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
-    await user.upload(screen.getByLabelText('写真を選択'), file)
+    await uploadAndConfirmCrop(user, file)
 
     await waitFor(() => screen.getByDisplayValue('カレーライス'))
     const titleInput = screen.getByDisplayValue('カレーライス')
@@ -156,5 +201,43 @@ describe('FromPhotoPage', () => {
     await user.type(titleInput, '編集後タイトル')
 
     expect(screen.getByDisplayValue('編集後タイトル')).toBeInTheDocument()
+  })
+
+  it('from パラメータがある場合: createRecipe の第2引数に渡される', async () => {
+    const user = userEvent.setup()
+    mockSearchParamsGet.mockReturnValue('/calendar/2026-03-14')
+    mockCreateRecipe.mockResolvedValue(undefined)
+    render(<FromPhotoPage />)
+
+    const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
+    await uploadAndConfirmCrop(user, file)
+    await waitFor(() => screen.getByDisplayValue('カレーライス'))
+    await user.click(screen.getByRole('button', { name: 'レシピを保存' }))
+
+    await waitFor(() => {
+      expect(mockCreateRecipe).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'カレーライス' }),
+        '/calendar/2026-03-14'
+      )
+    })
+  })
+
+  it('from パラメータがない場合: createRecipe の第2引数は undefined', async () => {
+    const user = userEvent.setup()
+    mockSearchParamsGet.mockReturnValue(null)
+    mockCreateRecipe.mockResolvedValue(undefined)
+    render(<FromPhotoPage />)
+
+    const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
+    await uploadAndConfirmCrop(user, file)
+    await waitFor(() => screen.getByDisplayValue('カレーライス'))
+    await user.click(screen.getByRole('button', { name: 'レシピを保存' }))
+
+    await waitFor(() => {
+      expect(mockCreateRecipe).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'カレーライス' }),
+        undefined
+      )
+    })
   })
 })

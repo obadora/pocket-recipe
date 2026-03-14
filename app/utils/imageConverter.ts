@@ -1,14 +1,23 @@
-export async function convertImage(file: File): Promise<{ convertedFile: File; previewUrl: string }> {
-  const formData = new FormData()
-  formData.append('file', file)
+'use client'
 
-  const res = await fetch('/api/images/convert', { method: 'POST', body: formData })
+function isHeic(file: File): boolean {
+  if (file.type === 'image/heic' || file.type === 'image/heif') return true
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  return ext === 'heic' || ext === 'heif'
+}
 
-  if (!res.ok) {
-    throw new Error('Failed to convert image')
+export async function prepareImageForCrop(file: File): Promise<string> {
+  if (isHeic(file)) {
+    const { heicTo } = await import('heic-to')
+    const blob = await heicTo({ blob: file, type: 'image/jpeg', quality: 0.7 })
+    return URL.createObjectURL(blob)
   }
+  return URL.createObjectURL(file)
+}
 
-  const blob = await res.blob()
+export async function convertImage(file: File): Promise<{ convertedFile: File; previewUrl: string }> {
+  const { heicTo } = await import('heic-to')
+  const blob = await heicTo({ blob: file, type: 'image/jpeg', quality: 0.7 })
   const baseName = file.name.replace(/\.[^.]+$/, '')
   const convertedFile = new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' })
   const previewUrl = URL.createObjectURL(blob)

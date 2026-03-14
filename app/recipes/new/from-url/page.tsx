@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useTransition, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { createRecipe, type IngredientInput, type StepInput } from '../../actions'
 import { parseRecipeFromUrl } from '../../../utils/recipeUrlParser'
 
-export default function FromUrlPage() {
+function FromUrlPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const from = searchParams.get('from') ?? undefined
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -26,6 +28,7 @@ export default function FromUrlPage() {
   const [steps, setSteps] = useState<StepInput[]>([{ description: '' }])
   const [categoryInput, setCategoryInput] = useState('')
   const [categories, setCategories] = useState<string[]>([])
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
 
   const handleLoadUrl = async () => {
     if (!url.trim()) {
@@ -47,8 +50,15 @@ export default function FromUrlPage() {
       if (parsed.description !== null) setDescription(parsed.description)
       if (parsed.servings !== null) setServings(String(parsed.servings))
       if (parsed.cookTime !== null) setCookTime(String(parsed.cookTime))
-      if (parsed.ingredients.length > 0) setIngredients(parsed.ingredients)
+      if (parsed.ingredients.length > 0) setIngredients(
+        parsed.ingredients.map((ing) => ({
+          name: ing.name ?? '',
+          amount: ing.amount ?? '',
+          unit: ing.unit ?? '',
+        }))
+      )
       if (parsed.steps.length > 0) setSteps(parsed.steps.map((s) => ({ description: s })))
+      setImageUrl(parsed.imageUrl)
     } catch {
       setParseError('解析に失敗しました。もう一度お試しください。')
     } finally {
@@ -99,9 +109,10 @@ export default function FromUrlPage() {
           ingredients,
           steps,
           categories,
+          imageUrl: imageUrl ?? undefined,
           sourceType: 'url',
           sourceUrl: url,
-        })
+        }, from)
       } catch (err) {
         if (isRedirectError(err)) throw err
         console.error('保存エラー:', err)
@@ -174,6 +185,21 @@ export default function FromUrlPage() {
               </button>
             </div>
           </section>
+
+          {/* 画像プレビュー */}
+          {imageUrl && (
+            <section className="bg-white rounded-xl border border-zinc-200 p-6 space-y-2">
+              <h2 className="text-base font-semibold text-zinc-900">画像</h2>
+              <div className="w-full rounded-lg overflow-hidden bg-zinc-100">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageUrl}
+                  alt="レシピ画像"
+                  className="w-full object-cover"
+                />
+              </div>
+            </section>
+          )}
 
           {/* 基本情報 */}
           <section className="bg-white rounded-xl border border-zinc-200 p-6 space-y-4">
@@ -349,5 +375,13 @@ export default function FromUrlPage() {
         </form>
       </main>
     </div>
+  )
+}
+
+export default function FromUrlPage() {
+  return (
+    <Suspense>
+      <FromUrlPageInner />
+    </Suspense>
   )
 }
