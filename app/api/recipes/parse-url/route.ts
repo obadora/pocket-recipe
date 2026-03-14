@@ -5,6 +5,9 @@ import { createClient } from '../../../utils/supabase/server'
 const CHROMIUM_REMOTE_URL =
   'https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar'
 
+const MIN_TEXT_LENGTH = 200
+const MAX_TEXT_LENGTH = 8000
+
 async function launchBrowser() {
   if (process.env.VERCEL) {
     const chromium = await import('@sparticuz/chromium-min')
@@ -57,6 +60,79 @@ const IMAGE_PROMPT = `この画像はレシピページのスクリーンショ�
 材料の量と単位が分離できない場合（例:「適量」）は amount にそのまま入れ unit は空文字にしてください。
 手順は配列の順序通りに並べてください。`
 
+async function fetchViaJina(url: string): Promise<string> {
+  const jinaUrl = `https://r.jina.ai/${url}`
+  const res = await fetch(jinaUrl, {
+    headers: { 'Accept': 'text/plain' },
+    signal: AbortSignal.timeout(5000),
+  })
+  if (!res.ok) throw new Error(`Jina fetch failed: ${res.status}`)
+  return res.text()
+}
+
+async function sendToGemini(content: string | Buffer, type: 'text' | 'image') {
+  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY!)
+  const modelName = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash-lite'
+  const model = genAI.getGenerativeModel({ model: modelName })
+
+  let result
+  if (type === 'image') {
+    const base64 = (content as Buffer).toString('base64')
+    result = await model.generateContent([
+      IMAGE_PROMPT,
+      { inlineData: { mimeType: 'image/png', data: base64 } },
+    ])
+  } else {
+    const truncated = (content as string).slice(0, MAX_TEXT_LENGTH)
+    result = await model.generateContent([TEXT_PROMPT + truncated])
+  }
+
+  const text = result.response.text().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
+  return JSON.parse(text)
+}
+
+// 十分なテキストを返した方を先着で解決するPromise
+// 両方失敗 or 両方テキスト不十分の場合は null を返す
+function raceFirstSufficientText(
+  jinaPromise: Promise<string>,
+  puppeteerPromise: Promise<string>,
+  log: (msg: string) => void,
+): Promise<{ source: 'jina' | 'puppeteer'; text: string } | null> {
+  return new Promise((resolve) => {
+    let settled = 0
+    let resolved = false
+    const total = 2
+
+    const tryResolve = (source: 'jina' | 'puppeteer', text: string) => {
+      settled++
+      if (!resolved && text.length >= MIN_TEXT_LENGTH) {
+        resolved = true
+        log(`${source} won the race (${text.length} chars)`)
+        resolve({ source, text })
+      } else if (settled === total && !resolved) {
+        // 両方終わったがどちらも不十分
+        resolve(null)
+      }
+    }
+
+    jinaPromise
+      .then((text) => tryResolve('jina', text))
+      .catch((err) => {
+        log(`Jina failed: ${err}`)
+        settled++
+        if (settled === total && !resolved) resolve(null)
+      })
+
+    puppeteerPromise
+      .then((text) => tryResolve('puppeteer', text))
+      .catch((err) => {
+        log(`Puppeteer failed: ${err}`)
+        settled++
+        if (settled === total && !resolved) resolve(null)
+      })
+  })
+}
+
 export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
@@ -84,46 +160,76 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'INVALID_URL' }, { status: 400 })
   }
 
+  const t0 = Date.now()
+  const elapsed = () => `${Date.now() - t0}ms`
+  const log = (msg: string) => console.log(`[parse-url] ${msg} elapsed=${elapsed()}`)
+
+  log(`start url=${url}`)
+
   const browser = await launchBrowser()
+  log('browser launched')
+
   try {
     const page = await browser.newPage()
     page.setDefaultNavigationTimeout(30000)
+    await page.setRequestInterception(true)
+    page.on('request', (req: { resourceType: () => string; abort: () => void; continue: () => void }) => {
+      const blocked = ['image', 'stylesheet', 'font', 'media']
+      if (blocked.includes(req.resourceType())) {
+        req.abort()
+      } else {
+        req.continue()
+      }
+    })
 
-    try {
-      await page.goto(url, { waitUntil: 'networkidle2' })
-    } catch {
+    const jinaPromise = (async () => {
+      log('Jina fetch start')
+      const text = await fetchViaJina(url)
+      log(`Jina fetch done textLength=${text.length}`)
+      return text
+    })()
+
+    const puppeteerPromise = (async () => {
+      log('Puppeteer page.goto start')
+      await page.goto(url, { waitUntil: 'domcontentloaded' })
+      log('Puppeteer page.goto done')
+      const text: string = await page.evaluate(() => {
+        const selectors = 'header, footer, nav, aside, script, style, noscript, iframe'
+        document.querySelectorAll(selectors).forEach((el) => el.remove())
+        return (document.body?.innerText ?? '')
+          .split('\n')
+          .map((line: string) => line.trim())
+          .filter((line: string) => line.length > 0)
+          .join('\n')
+      })
+      log(`Puppeteer evaluate done textLength=${text.length}`)
+      return text
+    })()
+
+    const winner = await raceFirstSufficientText(jinaPromise, puppeteerPromise, log)
+
+    if (winner) {
+      const parsed = await sendToGemini(winner.text, 'text')
+      log(`Gemini done (source=${winner.source})`)
+      return NextResponse.json(parsed, { status: 200 })
+    }
+
+    // 両方テキスト不十分 → Puppeteer が失敗していた場合は 422
+    const puppeteerResult = await puppeteerPromise.catch((err) => err)
+    if (puppeteerResult instanceof Error) {
+      log(`both failed, Puppeteer error: ${puppeteerResult}`)
       return NextResponse.json({ error: 'URL_FETCH_FAILED' }, { status: 422 })
     }
 
-    const scrapedText: string = await page.evaluate(() => {
-      const selectors = 'header, footer, nav, aside, script, style, noscript, iframe'
-      document.querySelectorAll(selectors).forEach((el) => el.remove())
-      return (document.body?.innerText ?? '')
-        .split('\n')
-        .map((line: string) => line.trim())
-        .filter((line: string) => line.length > 0)
-        .join('\n')
-    })
-
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY!)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
-
-    let result
-    if (scrapedText.length === 0) {
-      const screenshotBuffer = await page.screenshot({ fullPage: true, type: 'png' }) as Buffer
-      const base64 = screenshotBuffer.toString('base64')
-      result = await model.generateContent([
-        IMAGE_PROMPT,
-        { inlineData: { mimeType: 'image/png', data: base64 } },
-      ])
-    } else {
-      result = await model.generateContent([TEXT_PROMPT + scrapedText])
-    }
-
-    const text = result.response.text().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
-    const parsed = JSON.parse(text)
-
+    // スクリーンショット + Gemini Vision
+    log('both text insufficient, taking screenshot')
+    await page.setViewport({ width: 1200, height: 1800 })
+    const screenshotBuffer = await page.screenshot({ fullPage: true, type: 'png' }) as Buffer
+    log('screenshot done')
+    const parsed = await sendToGemini(screenshotBuffer, 'image')
+    log('Gemini done (source=screenshot)')
     return NextResponse.json(parsed, { status: 200 })
+
   } catch (err) {
     console.error('Recipe URL parse error:', err)
     return NextResponse.json({ error: 'Failed to parse recipe' }, { status: 500 })
