@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useTransition, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useTransition, useRef, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import ReactCrop, { type Crop, centerCrop, makeAspectCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
@@ -54,8 +54,10 @@ async function cropAndConvert(
   })
 }
 
-export default function FromPhotoPage() {
+function FromPhotoPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const from = searchParams.get('from') ?? undefined
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -198,7 +200,7 @@ export default function FromPhotoPage() {
           const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
           imageUrl = publicUrl
         }
-        await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories, imageUrl })
+        await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories, imageUrl }, from)
       } catch (err) {
         if (isRedirectError(err)) throw err
         console.error('保存エラー:', err)
@@ -507,5 +509,13 @@ export default function FromPhotoPage() {
         </form>
       </main>
     </div>
+  )
+}
+
+export default function FromPhotoPage() {
+  return (
+    <Suspense>
+      <FromPhotoPageInner />
+    </Suspense>
   )
 }

@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useTransition, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { createRecipe, type IngredientInput, type StepInput } from '../../actions'
 import { parseRecipeFromUrl } from '../../../utils/recipeUrlParser'
 
-export default function FromUrlPage() {
+function FromUrlPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const from = searchParams.get('from') ?? undefined
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -110,7 +112,7 @@ export default function FromUrlPage() {
           imageUrl: imageUrl ?? undefined,
           sourceType: 'url',
           sourceUrl: url,
-        })
+        }, from)
       } catch (err) {
         if (isRedirectError(err)) throw err
         console.error('保存エラー:', err)
@@ -373,5 +375,13 @@ export default function FromUrlPage() {
         </form>
       </main>
     </div>
+  )
+}
+
+export default function FromUrlPage() {
+  return (
+    <Suspense>
+      <FromUrlPageInner />
+    </Suspense>
   )
 }

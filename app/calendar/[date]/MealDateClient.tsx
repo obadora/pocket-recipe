@@ -159,6 +159,26 @@ export default function MealDateClient({ date, recipes, mealRecords }: Props) {
           onChange={(e) => setQuery(e.target.value)}
           className="w-full mb-4 px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-300"
         />
+        <div className="flex gap-2 mb-4">
+          <Link
+            href={`/recipes/new?from=/calendar/${date}`}
+            className="flex-1 text-center px-3 py-2 text-xs font-medium border border-zinc-300 rounded-lg text-zinc-700 hover:bg-zinc-50 transition-colors"
+          >
+            手動で作成
+          </Link>
+          <Link
+            href={`/recipes/new/from-url?from=/calendar/${date}`}
+            className="flex-1 text-center px-3 py-2 text-xs font-medium border border-zinc-300 rounded-lg text-zinc-700 hover:bg-zinc-50 transition-colors"
+          >
+            URLから作成
+          </Link>
+          <Link
+            href={`/recipes/new/from-photo?from=/calendar/${date}`}
+            className="flex-1 text-center px-3 py-2 text-xs font-medium border border-zinc-300 rounded-lg text-zinc-700 hover:bg-zinc-50 transition-colors"
+          >
+            写真から作成
+          </Link>
+        </div>
         {filtered.length === 0 ? (
           <p className="text-sm text-zinc-400">該当するレシピがありません</p>
         ) : (

@@ -3,10 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ParsedRecipe } from '../../../types/recipe'
 
-const { mockParseRecipeFromUrl, mockCreateRecipe, mockRouterBack } = vi.hoisted(() => ({
+const { mockParseRecipeFromUrl, mockCreateRecipe, mockRouterBack, mockSearchParamsGet } = vi.hoisted(() => ({
   mockParseRecipeFromUrl: vi.fn(),
   mockCreateRecipe: vi.fn(),
   mockRouterBack: vi.fn(),
+  mockSearchParamsGet: vi.fn().mockReturnValue(null),
 }))
 
 vi.mock('../../../utils/recipeUrlParser', () => ({
@@ -19,6 +20,7 @@ vi.mock('../../actions', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ back: mockRouterBack }),
+  useSearchParams: () => ({ get: mockSearchParamsGet }),
 }))
 
 import FromUrlPage from './page'
@@ -171,7 +173,8 @@ describe('FromUrlPage', () => {
         expect.objectContaining({
           sourceType: 'url',
           sourceUrl: 'https://example.com/recipe',
-        })
+        }),
+        undefined
       )
     })
   })
@@ -183,5 +186,43 @@ describe('FromUrlPage', () => {
     await user.click(screen.getByText('← 戻る'))
 
     expect(mockRouterBack).toHaveBeenCalled()
+  })
+
+  it('from パラメータがある場合: createRecipe の第2引数に渡される', async () => {
+    const user = userEvent.setup()
+    mockSearchParamsGet.mockReturnValue('/calendar/2026-03-14')
+    mockCreateRecipe.mockResolvedValue(undefined)
+    render(<FromUrlPage />)
+
+    await user.type(screen.getByPlaceholderText('https://example.com/recipe'), 'https://example.com/recipe')
+    await user.click(screen.getByText('URLから読み込む'))
+    await waitFor(() => expect(screen.getByDisplayValue('カレーライス')).toBeInTheDocument())
+    await user.click(screen.getByText('レシピを保存'))
+
+    await waitFor(() => {
+      expect(mockCreateRecipe).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'カレーライス' }),
+        '/calendar/2026-03-14'
+      )
+    })
+  })
+
+  it('from パラメータがない場合: createRecipe の第2引数は undefined', async () => {
+    const user = userEvent.setup()
+    mockSearchParamsGet.mockReturnValue(null)
+    mockCreateRecipe.mockResolvedValue(undefined)
+    render(<FromUrlPage />)
+
+    await user.type(screen.getByPlaceholderText('https://example.com/recipe'), 'https://example.com/recipe')
+    await user.click(screen.getByText('URLから読み込む'))
+    await waitFor(() => expect(screen.getByDisplayValue('カレーライス')).toBeInTheDocument())
+    await user.click(screen.getByText('レシピを保存'))
+
+    await waitFor(() => {
+      expect(mockCreateRecipe).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'カレーライス' }),
+        undefined
+      )
+    })
   })
 })

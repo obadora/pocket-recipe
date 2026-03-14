@@ -2,12 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-const { mockCreateRecipe, mockRouterBack, mockSupabaseGetUser, mockSupabaseUpload, mockSupabaseGetPublicUrl } = vi.hoisted(() => ({
+const { mockCreateRecipe, mockRouterBack, mockSupabaseGetUser, mockSupabaseUpload, mockSupabaseGetPublicUrl, mockSearchParamsGet } = vi.hoisted(() => ({
   mockCreateRecipe: vi.fn(),
   mockRouterBack: vi.fn(),
   mockSupabaseGetUser: vi.fn(),
   mockSupabaseUpload: vi.fn(),
   mockSupabaseGetPublicUrl: vi.fn(),
+  mockSearchParamsGet: vi.fn().mockReturnValue(null),
 }))
 
 vi.mock('../actions', () => ({
@@ -16,6 +17,7 @@ vi.mock('../actions', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ back: mockRouterBack }),
+  useSearchParams: () => ({ get: mockSearchParamsGet }),
 }))
 
 vi.mock('../../utils/imageConverter', () => ({
@@ -82,7 +84,8 @@ describe('NewRecipePage', () => {
     await waitFor(() => {
       expect(mockSupabaseUpload).toHaveBeenCalled()
       expect(mockCreateRecipe).toHaveBeenCalledWith(
-        expect.objectContaining({ imageUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/uuid.jpg' })
+        expect.objectContaining({ imageUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/uuid.jpg' }),
+        undefined
       )
     })
   })
@@ -135,7 +138,8 @@ describe('NewRecipePage', () => {
 
     await waitFor(() => {
       expect(mockCreateRecipe).toHaveBeenCalledWith(
-        expect.objectContaining({ title: '肉じゃが' })
+        expect.objectContaining({ title: '肉じゃが' }),
+        undefined
       )
     })
   })
@@ -206,5 +210,39 @@ describe('NewRecipePage', () => {
 
     await user.click(screen.getByRole('button', { name: 'キャンセル' }))
     expect(mockRouterBack).toHaveBeenCalledTimes(2)
+  })
+
+  it('from パラメータがある場合: createRecipe の第2引数に渡される', async () => {
+    const user = userEvent.setup()
+    mockSearchParamsGet.mockReturnValue('/calendar/2026-03-14')
+    mockCreateRecipe.mockResolvedValue(undefined)
+    render(<NewRecipePage />)
+
+    await user.type(screen.getByPlaceholderText('例: 肉じゃが'), '肉じゃが')
+    await user.click(screen.getByRole('button', { name: 'レシピを保存' }))
+
+    await waitFor(() => {
+      expect(mockCreateRecipe).toHaveBeenCalledWith(
+        expect.objectContaining({ title: '肉じゃが' }),
+        '/calendar/2026-03-14'
+      )
+    })
+  })
+
+  it('from パラメータがない場合: createRecipe の第2引数は undefined', async () => {
+    const user = userEvent.setup()
+    mockSearchParamsGet.mockReturnValue(null)
+    mockCreateRecipe.mockResolvedValue(undefined)
+    render(<NewRecipePage />)
+
+    await user.type(screen.getByPlaceholderText('例: 肉じゃが'), '肉じゃが')
+    await user.click(screen.getByRole('button', { name: 'レシピを保存' }))
+
+    await waitFor(() => {
+      expect(mockCreateRecipe).toHaveBeenCalledWith(
+        expect.objectContaining({ title: '肉じゃが' }),
+        undefined
+      )
+    })
   })
 })
