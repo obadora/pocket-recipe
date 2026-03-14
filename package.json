@@ -20,6 +20,7 @@
     "@types/pg": "^8.16.0",
     "date-holidays": "^3.26.9",
     "heic-convert": "^2.1.0",
+    "heic-to": "^1.4.2",
     "next": "16.1.6",
     "pg": "^8.18.0",
     "prisma": "^7.4.1",
