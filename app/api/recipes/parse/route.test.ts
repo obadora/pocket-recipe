@@ -7,18 +7,21 @@ const { mockGetUser, mockGenerateContent } = vi.hoisted(() => {
   return { mockGetUser, mockGenerateContent }
 })
 
+
 vi.mock('../../../utils/supabase/server', () => ({
   createClient: vi.fn().mockResolvedValue({
     auth: { getUser: mockGetUser },
   }),
 }))
 
+const { mockGetGenerativeModel } = vi.hoisted(() => ({
+  mockGetGenerativeModel: vi.fn(),
+}))
+
 vi.mock('@google/generative-ai', () => {
   function GoogleGenerativeAI() {
     return {
-      getGenerativeModel: vi.fn().mockReturnValue({
-        generateContent: mockGenerateContent,
-      }),
+      getGenerativeModel: mockGetGenerativeModel,
     }
   }
   return { GoogleGenerativeAI }
@@ -48,6 +51,19 @@ describe('POST /api/recipes/parse', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
+    mockGetGenerativeModel.mockReturnValue({ generateContent: mockGenerateContent })
+  })
+
+  it('GEMINI_MODEL 環境変数のモデルが使われる', async () => {
+    process.env.GEMINI_MODEL = 'gemini-3.1-flash-lite-preview'
+    mockGenerateContent.mockResolvedValue({
+      response: { text: () => JSON.stringify(validParsedRecipe) },
+    })
+
+    const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
+    await POST(makeRequest(file) as unknown as Request)
+
+    expect(mockGetGenerativeModel).toHaveBeenCalledWith({ model: 'gemini-3.1-flash-lite-preview' })
   })
 
   it('未認証の場合は 401 を返す', async () => {

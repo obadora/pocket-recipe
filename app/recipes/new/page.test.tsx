@@ -69,8 +69,8 @@ describe('NewRecipePage', () => {
 
   it('写真付きで送信すると storage.upload が呼ばれ createRecipe に imageUrl が渡される', async () => {
     const user = userEvent.setup()
-    mockSupabaseUpload.mockResolvedValue({ data: { path: 'user-1/uuid.jpg' }, error: null })
-    mockSupabaseGetPublicUrl.mockReturnValue({ data: { publicUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/user-1/uuid.jpg' } })
+    mockSupabaseUpload.mockResolvedValue({ data: { path: 'photos/user-1/uuid.jpg' }, error: null })
+    mockSupabaseGetPublicUrl.mockReturnValue({ data: { publicUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/uuid.jpg' } })
     mockCreateRecipe.mockResolvedValue(undefined)
     render(<NewRecipePage />)
 
@@ -82,7 +82,7 @@ describe('NewRecipePage', () => {
     await waitFor(() => {
       expect(mockSupabaseUpload).toHaveBeenCalled()
       expect(mockCreateRecipe).toHaveBeenCalledWith(
-        expect.objectContaining({ imageUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/user-1/uuid.jpg' })
+        expect.objectContaining({ imageUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/uuid.jpg' })
       )
     })
   })

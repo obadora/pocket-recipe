@@ -73,7 +73,7 @@ async function fetchViaJina(url: string): Promise<string> {
 
 async function sendToGemini(content: string | Buffer, type: 'text' | 'image') {
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY!)
-  const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite'
+  const modelName = process.env.GEMINI_MODEL!
   const model = genAI.getGenerativeModel({ model: modelName })
 
   let result

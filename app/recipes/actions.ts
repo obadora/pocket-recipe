@@ -55,14 +55,18 @@ export async function createRecipe(input: CreateRecipeInput) {
           .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
           .jpeg({ quality: 80 })
           .toBuffer()
-        const filePath = `url-imports/${randomUUID()}.jpg`
+        const filePath = `url-imports/${user.id}/${randomUUID()}.jpg`
         const { error } = await supabase.storage
           .from('recipe-images')
           .upload(filePath, resized, { contentType: 'image/jpeg', upsert: false })
         if (!error) {
           const { data } = supabase.storage.from('recipe-images').getPublicUrl(filePath)
           resolvedImageUrl = data.publicUrl
+        } else {
+          resolvedImageUrl = null
         }
+      } else {
+        resolvedImageUrl = null
       }
     } catch {
       // 画像保存失敗時は null にする

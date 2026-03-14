@@ -188,7 +188,7 @@ export default function FromPhotoPage() {
             setUploadError('セッションが切れました。再ログインしてください。')
             return
           }
-          const path = `${user.id}/${crypto.randomUUID()}.jpg`
+          const path = `photos/${user.id}/${crypto.randomUUID()}.jpg`
           const { error: uploadErr } = await supabase.storage.from('recipe-images').upload(path, imageFile)
           if (uploadErr) {
             console.error('Storageアップロードエラー:', uploadErr)
