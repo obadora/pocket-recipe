@@ -121,7 +121,17 @@ function FromPhotoPageInner() {
     }
     setUploadError(null)
     setParseError(null)
-    await mergeAndParseImages(files)
+    // Always go through crop flow when adding one at a time
+    setIsConverting(true)
+    try {
+      const url = await prepareImageForCrop(files[0])
+      setCropSrc(url)
+      setCrop(undefined)
+    } catch {
+      setUploadError('画像の変換に失敗しました。もう一度お試しください。')
+    } finally {
+      setIsConverting(false)
+    }
   }
 
   const mergeAndParseImages = async (files: File[]) => {
@@ -151,6 +161,25 @@ function FromPhotoPageInner() {
     }
   }
 
+  const handleParse = async () => {
+    if (imageItems.length === 0) return
+    setParseError(null)
+    setIsParsing(true)
+    try {
+      const parsed = await parseRecipeFromImages(imageItems.map((i) => i.file))
+      if (parsed.title !== null) setTitle(parsed.title)
+      if (parsed.description !== null) setDescription(parsed.description)
+      if (parsed.servings !== null) setServings(String(parsed.servings))
+      if (parsed.cookTime !== null) setCookTime(String(parsed.cookTime))
+      if (parsed.ingredients.length > 0) setIngredients(parsed.ingredients)
+      if (parsed.steps.length > 0) setSteps(parsed.steps.map((s) => ({ description: s })))
+    } catch {
+      setParseError('解析に失敗しました。もう一度お試しください。')
+    } finally {
+      setIsParsing(false)
+    }
+  }
+
   const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const { width, height } = e.currentTarget
     const initialCrop = centerCrop(
@@ -163,25 +192,14 @@ function FromPhotoPageInner() {
 
   const handleCropConfirm = async () => {
     if (!imgRef.current || !cropSrc) return
-    // If no crop selected, use full image
     const activeCrop: Crop = crop ?? { unit: '%', x: 0, y: 0, width: 100, height: 100 }
-    setIsParsing(true)
     setCropSrc(null)
     try {
       const file = await cropAndConvert(imgRef.current, activeCrop)
       const previewUrl = URL.createObjectURL(file)
       setImageItems((prev) => [...prev, { file, previewUrl }].slice(0, 5))
-      const parsed = await parseRecipeFromImages([file])
-      if (parsed.title !== null) setTitle(parsed.title)
-      if (parsed.description !== null) setDescription(parsed.description)
-      if (parsed.servings !== null) setServings(String(parsed.servings))
-      if (parsed.cookTime !== null) setCookTime(String(parsed.cookTime))
-      if (parsed.ingredients.length > 0) setIngredients(parsed.ingredients)
-      if (parsed.steps.length > 0) setSteps(parsed.steps.map((s) => ({ description: s })))
     } catch {
-      setParseError('解析に失敗しました。もう一度お試しください。')
-    } finally {
-      setIsParsing(false)
+      setUploadError('画像の変換に失敗しました。もう一度お試しください。')
     }
   }
 
@@ -366,7 +384,7 @@ function FromPhotoPageInner() {
                     </div>
                   ))}
                 </div>
-                {isParsing && (
+                {isParsing ? (
                   <div className="flex items-center justify-center gap-2 text-sm text-zinc-500">
                     <svg className="animate-spin h-4 w-4 text-zinc-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -374,30 +392,39 @@ function FromPhotoPageInner() {
                     </svg>
                     画像読み取り中・・・
                   </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleParse}
+                    className="w-full py-2.5 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition-colors"
+                  >
+                    解析する
+                  </button>
                 )}
                 {parseError && (
                   <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
                     {parseError}
                   </p>
                 )}
-                <label className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer">
-                  写真を追加
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    aria-label="写真を追加"
-                    className="sr-only"
-                    onChange={handleAddImages}
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={clearImage}
-                  className="block text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
-                >
-                  写真を削除
-                </button>
+                <div className="flex gap-3">
+                  <label className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer">
+                    写真を追加
+                    <input
+                      type="file"
+                      accept="image/*"
+                      aria-label="写真を追加"
+                      className="sr-only"
+                      onChange={handleAddImages}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={clearImage}
+                    className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+                  >
+                    写真を削除
+                  </button>
+                </div>
               </div>
             )}
 
