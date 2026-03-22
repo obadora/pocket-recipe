@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { signIn, signInWithGoogle } from '../actions'
 
+
 type Props = {
   searchParams: Promise<{ error?: string; message?: string }>
 }
@@ -38,9 +39,14 @@ export default async function LoginPage({ searchParams }: Props) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="password" className="text-sm font-medium text-zinc-700">
-            パスワード
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="text-sm font-medium text-zinc-700">
+              パスワード
+            </label>
+            <Link href="/forgot-password" className="text-xs text-zinc-500 hover:text-zinc-800 hover:underline">
+              パスワードを忘れた方
+            </Link>
+          </div>
           <input
             id="password"
             name="password"

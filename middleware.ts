@@ -3,7 +3,7 @@ import { updateSession } from './app/utils/supabase/middleware'
 import { createClient } from './app/utils/supabase/server'
 
 // 未ログインでもアクセスできるパス
-const PUBLIC_PATHS = ['/login', '/signup', '/auth/callback']
+const PUBLIC_PATHS = ['/login', '/signup', '/auth/callback', '/forgot-password', '/auth/reset-password']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
