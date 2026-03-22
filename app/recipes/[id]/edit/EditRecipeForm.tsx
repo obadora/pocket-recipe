@@ -179,7 +179,7 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
           <button
             type="button"
             onClick={() => router.back()}
-            className="text-sm text-zinc-500 hover:text-zinc-900 active:text-zinc-700 transition-colors"
+            className="text-sm text-zinc-500 hover:text-zinc-900 px-2 py-1 rounded-lg hover:bg-zinc-100 active:bg-zinc-200 transition-colors"
           >
             ← 戻る
           </button>

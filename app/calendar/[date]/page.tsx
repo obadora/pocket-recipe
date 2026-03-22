@@ -51,7 +51,7 @@ export default async function CalendarDatePage({ params }: Props) {
     <div className="min-h-screen bg-zinc-50">
       <header className="bg-white border-b border-zinc-200">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Link href="/?tab=calendar" className="text-sm text-zinc-500 hover:text-zinc-900 active:text-zinc-700 transition-colors">
+          <Link href="/?tab=calendar" className="text-sm text-zinc-500 hover:text-zinc-900 px-2 py-1 rounded-lg hover:bg-zinc-100 active:bg-zinc-200 transition-colors">
             ← カレンダーへ
           </Link>
           <h1 className="text-lg font-semibold text-zinc-900">{formatDateLabel(date)}</h1>

@@ -52,7 +52,7 @@ export default async function LoginPage({ searchParams }: Props) {
 
         <button
           type="submit"
-          className="mt-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
+          className="mt-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 active:bg-zinc-800 transition-colors"
         >
           ログイン
         </button>
