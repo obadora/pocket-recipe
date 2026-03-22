@@ -38,6 +38,17 @@ function makeRequest(file?: File) {
   })
 }
 
+function makeRequestWithImages(files: File[]) {
+  const formData = new FormData()
+  for (const file of files) {
+    formData.append('images[]', file)
+  }
+  return new Request('http://localhost/api/recipes/parse', {
+    method: 'POST',
+    body: formData,
+  })
+}
+
 const validParsedRecipe: ParsedRecipe = {
   title: 'カレーライス',
   description: '定番カレー',
@@ -134,5 +145,49 @@ describe('POST /api/recipes/parse', () => {
     const res = await POST(makeRequest(file) as unknown as Request)
 
     expect(res.status).toBe(500)
+  })
+
+  describe('images[] (multi-image) サポート', () => {
+    it('2枚の画像を送ると generateContent が [PROMPT, inlineData1, inlineData2] で呼ばれる', async () => {
+      mockGenerateContent.mockResolvedValue({
+        response: { text: () => JSON.stringify(validParsedRecipe) },
+      })
+
+      const file1 = new File(['aaa'], 'photo1.jpg', { type: 'image/jpeg' })
+      const file2 = new File(['bbb'], 'photo2.png', { type: 'image/png' })
+      const res = await POST(makeRequestWithImages([file1, file2]) as unknown as Request)
+
+      expect(res.status).toBe(200)
+      expect(mockGenerateContent).toHaveBeenCalledOnce()
+      const callArgs = mockGenerateContent.mock.calls[0][0]
+      expect(callArgs).toHaveLength(3) // PROMPT + 2 inlineData parts
+      expect(typeof callArgs[0]).toBe('string') // PROMPT
+      expect(callArgs[1]).toMatchObject({ inlineData: { mimeType: 'image/jpeg' } })
+      expect(callArgs[2]).toMatchObject({ inlineData: { mimeType: 'image/png' } })
+    })
+
+    it('images[] に 1 枚送ると通常通り 200 を返す', async () => {
+      mockGenerateContent.mockResolvedValue({
+        response: { text: () => JSON.stringify(validParsedRecipe) },
+      })
+
+      const file = new File(['aaa'], 'photo.jpg', { type: 'image/jpeg' })
+      const res = await POST(makeRequestWithImages([file]) as unknown as Request)
+
+      expect(res.status).toBe(200)
+      const callArgs = mockGenerateContent.mock.calls[0][0]
+      expect(callArgs).toHaveLength(2) // PROMPT + 1 inlineData
+    })
+
+    it('image も images[] もない場合は 400 を返す', async () => {
+      const formData = new FormData()
+      const req = new Request('http://localhost/api/recipes/parse', {
+        method: 'POST',
+        body: formData,
+      })
+      const res = await POST(req as unknown as Request)
+
+      expect(res.status).toBe(400)
+    })
   })
 })

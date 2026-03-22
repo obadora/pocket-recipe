@@ -28,21 +28,30 @@ export async function POST(req: NextRequest) {
     }
 
     const formData = await req.formData()
-    const image = formData.get('image')
-    if (!image || !(image instanceof File)) {
+
+    // Support both multi-image (images[]) and legacy single-image (image) fields
+    const multiImages = formData.getAll('images[]').filter((v): v is File => v instanceof File)
+    const legacyImage = formData.get('image')
+    const images: File[] = multiImages.length > 0
+      ? multiImages
+      : legacyImage instanceof File ? [legacyImage] : []
+
+    if (images.length === 0) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 })
     }
 
-    const arrayBuffer = await image.arrayBuffer()
-    const base64 = Buffer.from(arrayBuffer).toString('base64')
+    const inlineParts = await Promise.all(
+      images.map(async (img) => {
+        const arrayBuffer = await img.arrayBuffer()
+        const base64 = Buffer.from(arrayBuffer).toString('base64')
+        return { inlineData: { mimeType: img.type || 'image/jpeg', data: base64 } }
+      })
+    )
 
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY!)
     const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL! })
 
-    const result = await model.generateContent([
-      PROMPT,
-      { inlineData: { mimeType: image.type || 'image/jpeg', data: base64 } },
-    ])
+    const result = await model.generateContent([PROMPT, ...inlineParts])
 
     const text = result.response.text().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
     const parsed = JSON.parse(text)
