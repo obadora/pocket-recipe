@@ -87,7 +87,7 @@ function NewRecipePageInner() {
     setError(null)
     startTransition(async () => {
       try {
-        let imageUrl: string | undefined
+        let images: import('../actions').RecipeImageInput[] = []
         if (imageFile) {
           const supabase = createClient()
           const { data: { user } } = await supabase.auth.getUser()
@@ -103,9 +103,9 @@ function NewRecipePageInner() {
             return
           }
           const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
-          imageUrl = publicUrl
+          images = [{ url: publicUrl, isMain: true, order: 0 }]
         }
-        await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories, imageUrl }, from)
+        await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories, images }, from)
       } catch (err) {
         if (isRedirectError(err)) throw err
         console.error('保存エラー:', err)

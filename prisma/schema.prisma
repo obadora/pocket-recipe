@@ -33,7 +33,6 @@ model Recipe {
   description String?
   servings    Int?
   cookTime    Int?     @map("cook_time") // 分
-  imageUrl    String?  @map("image_url")
   sourceUrl   String?  @map("source_url")
   sourceType  String?  @map("source_type") // 'url' | 'photo' | 'manual'
   createdAt   DateTime @default(now()) @map("created_at")
@@ -44,8 +43,23 @@ model Recipe {
   steps       Step[]
   categories  RecipeCategory[]
   mealRecords MealRecord[]
+  images      RecipeImage[]
 
   @@map("recipes")
+}
+
+// レシピ画像
+model RecipeImage {
+  id        String   @id @default(uuid())
+  recipeId  String   @map("recipe_id")
+  url       String
+  order     Int      @default(0)
+  isMain    Boolean  @default(false) @map("is_main")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@map("recipe_images")
 }
 
 // 材料

@@ -20,6 +20,7 @@ export default async function EditRecipePage({ params }: Props) {
       ingredients: { orderBy: { order: 'asc' } },
       steps: { orderBy: { order: 'asc' } },
       categories: { include: { category: true } },
+      images: { orderBy: { order: 'asc' } },
     },
   })
 
@@ -37,7 +38,7 @@ export default async function EditRecipePage({ params }: Props) {
     })),
     steps: recipe.steps.map((step) => ({ description: step.description })),
     categories: recipe.categories.map((rc) => rc.category.name),
-    imageUrl: recipe.imageUrl,
+    images: recipe.images.map((img) => ({ url: img.url, isMain: img.isMain, order: img.order })),
   }
 
   return <EditRecipeForm recipeId={recipe.id} initialValues={initialValues} />

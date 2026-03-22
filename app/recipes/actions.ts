@@ -17,6 +17,12 @@ export type StepInput = {
   description: string
 }
 
+export type RecipeImageInput = {
+  url: string
+  isMain: boolean
+  order: number
+}
+
 export type CreateRecipeInput = {
   title: string
   description: string
@@ -25,9 +31,13 @@ export type CreateRecipeInput = {
   ingredients: IngredientInput[]
   steps: StepInput[]
   categories: string[]
-  imageUrl?: string
+  images?: RecipeImageInput[]
   sourceType?: 'url' | 'photo' | 'manual'
   sourceUrl?: string
+}
+
+export type UpdateRecipeInput = CreateRecipeInput & {
+  deletedImageUrls?: string[]
 }
 
 const calendarPattern = /^\/calendar\/(\d{4}-\d{2}-\d{2})$/
@@ -47,33 +57,36 @@ export async function createRecipe(input: CreateRecipeInput, from?: string) {
   const cookTime = input.cookTime ? parseInt(input.cookTime, 10) : null
 
   // 外部URLの画像をバケットに保存
-  let resolvedImageUrl = input.imageUrl ?? null
-  if (input.imageUrl && !input.imageUrl.includes(process.env.NEXT_PUBLIC_SUPABASE_URL!)) {
-    try {
-      const res = await fetch(input.imageUrl, { signal: AbortSignal.timeout(10000) })
-      if (res.ok) {
-        const arrayBuffer = await res.arrayBuffer()
-        const resized = await sharp(Buffer.from(arrayBuffer))
-          .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
-          .jpeg({ quality: 80 })
-          .toBuffer()
-        const filePath = `url-imports/${user.id}/${randomUUID()}.jpg`
-        const { error } = await supabase.storage
-          .from('recipe-images')
-          .upload(filePath, resized, { contentType: 'image/jpeg', upsert: false })
-        if (!error) {
-          const { data } = supabase.storage.from('recipe-images').getPublicUrl(filePath)
-          resolvedImageUrl = data.publicUrl
-        } else {
-          resolvedImageUrl = null
+  let resolvedImages: RecipeImageInput[] = input.images ?? []
+  if (input.sourceType === 'url' && resolvedImages.length > 0) {
+    const uploadedImages: RecipeImageInput[] = []
+    for (const img of resolvedImages) {
+      if (!img.url.includes(process.env.NEXT_PUBLIC_SUPABASE_URL!)) {
+        try {
+          const res = await fetch(img.url, { signal: AbortSignal.timeout(10000) })
+          if (res.ok) {
+            const arrayBuffer = await res.arrayBuffer()
+            const resized = await sharp(Buffer.from(arrayBuffer))
+              .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+              .jpeg({ quality: 80 })
+              .toBuffer()
+            const filePath = `url-imports/${user.id}/${randomUUID()}.jpg`
+            const { error } = await supabase.storage
+              .from('recipe-images')
+              .upload(filePath, resized, { contentType: 'image/jpeg', upsert: false })
+            if (!error) {
+              const { data } = supabase.storage.from('recipe-images').getPublicUrl(filePath)
+              uploadedImages.push({ ...img, url: data.publicUrl })
+            }
+          }
+        } catch {
+          // 画像保存失敗時はスキップ
         }
       } else {
-        resolvedImageUrl = null
+        uploadedImages.push(img)
       }
-    } catch {
-      // 画像保存失敗時は null にする
-      resolvedImageUrl = null
     }
+    resolvedImages = uploadedImages
   }
 
   const categoryIds: string[] = []
@@ -88,6 +101,9 @@ export async function createRecipe(input: CreateRecipeInput, from?: string) {
     categoryIds.push(category.id)
   }
 
+  const hasImages = resolvedImages.length > 0
+  const sourceType = input.sourceType ?? (hasImages ? 'photo' : 'manual')
+
   const recipe = await prisma.recipe.create({
     data: {
       userId: user.id,
@@ -95,8 +111,7 @@ export async function createRecipe(input: CreateRecipeInput, from?: string) {
       description: input.description || null,
       servings,
       cookTime,
-      imageUrl: resolvedImageUrl,
-      sourceType: input.sourceType ?? (resolvedImageUrl ? 'photo' : 'manual'),
+      sourceType,
       sourceUrl: input.sourceUrl ?? null,
       ingredients: {
         create: input.ingredients
@@ -119,6 +134,13 @@ export async function createRecipe(input: CreateRecipeInput, from?: string) {
       categories: {
         create: categoryIds.map((categoryId) => ({ categoryId })),
       },
+      images: {
+        create: resolvedImages.map((img) => ({
+          url: img.url,
+          isMain: img.isMain,
+          order: img.order,
+        })),
+      },
     },
   })
 
@@ -139,8 +161,6 @@ export async function createRecipe(input: CreateRecipeInput, from?: string) {
 
   redirect('/')
 }
-
-export type UpdateRecipeInput = CreateRecipeInput
 
 export async function updateRecipe(recipeId: string, input: UpdateRecipeInput) {
   const supabase = await createClient()
@@ -195,10 +215,14 @@ export async function updateRecipe(recipeId: string, input: UpdateRecipeInput) {
       order: index,
     }))
 
+  const hasImages = (input.images ?? []).length > 0
+  const sourceType = hasImages ? 'photo' : 'manual'
+
   await prisma.$transaction([
     prisma.ingredient.deleteMany({ where: { recipeId } }),
     prisma.step.deleteMany({ where: { recipeId } }),
     prisma.recipeCategory.deleteMany({ where: { recipeId } }),
+    prisma.recipeImage.deleteMany({ where: { recipeId } }),
     prisma.recipe.update({
       where: { id: recipeId },
       data: {
@@ -206,8 +230,7 @@ export async function updateRecipe(recipeId: string, input: UpdateRecipeInput) {
         description: input.description || null,
         servings,
         cookTime,
-        imageUrl: input.imageUrl ?? null,
-        sourceType: input.imageUrl ? 'photo' : 'manual',
+        sourceType,
       },
     }),
     prisma.ingredient.createMany({ data: filteredIngredients }),
@@ -215,7 +238,31 @@ export async function updateRecipe(recipeId: string, input: UpdateRecipeInput) {
     prisma.recipeCategory.createMany({
       data: categoryIds.map((categoryId) => ({ recipeId, categoryId })),
     }),
+    prisma.recipeImage.createMany({
+      data: (input.images ?? []).map((img) => ({
+        recipeId,
+        url: img.url,
+        isMain: img.isMain,
+        order: img.order,
+      })),
+    }),
   ])
+
+  // deletedImageUrls の Storage 削除
+  if (input.deletedImageUrls && input.deletedImageUrls.length > 0) {
+    const paths = input.deletedImageUrls.flatMap((url) => {
+      try {
+        const parsed = new URL(url)
+        const parts = parsed.pathname.split('/storage/v1/object/public/recipe-images/')
+        return parts[1] ? [parts[1]] : []
+      } catch {
+        return []
+      }
+    })
+    if (paths.length > 0) {
+      await supabase.storage.from('recipe-images').remove(paths)
+    }
+  }
 
   redirect(`/recipes/${recipeId}`)
 }
@@ -240,11 +287,23 @@ export async function deleteRecipe(recipeId: string) {
     return
   }
 
-  if (recipe.imageUrl) {
-    const url = new URL(recipe.imageUrl)
-    const pathParts = url.pathname.split('/storage/v1/object/public/recipe-images/')
-    if (pathParts[1]) {
-      await supabase.storage.from('recipe-images').remove([pathParts[1]])
+  const images = await prisma.recipeImage.findMany({
+    where: { recipeId },
+    select: { url: true },
+  })
+
+  if (images.length > 0) {
+    const paths = images.flatMap(({ url }) => {
+      try {
+        const parsed = new URL(url)
+        const parts = parsed.pathname.split('/storage/v1/object/public/recipe-images/')
+        return parts[1] ? [parts[1]] : []
+      } catch {
+        return []
+      }
+    })
+    if (paths.length > 0) {
+      await supabase.storage.from('recipe-images').remove(paths)
     }
   }
 

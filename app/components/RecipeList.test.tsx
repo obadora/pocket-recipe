@@ -8,7 +8,8 @@ const makeRecipe = (overrides = {}) => ({
   description: null,
   servings: null,
   cookTime: null,
-  categories: [],
+  images: [] as Array<{ url: string; isMain: boolean; order: number }>,
+  categories: [] as Array<{ category: { id: string; name: string } }>,
   ...overrides,
 })
 

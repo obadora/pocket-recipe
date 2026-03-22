@@ -7,8 +7,8 @@ import ReactCrop, { type Crop, centerCrop, makeAspectCrop } from 'react-image-cr
 import 'react-image-crop/dist/ReactCrop.css'
 import { createRecipe, type IngredientInput, type StepInput } from '../../actions'
 import { createClient } from '../../../utils/supabase/client'
-import { prepareImageForCrop } from '../../../utils/imageConverter'
-import { parseRecipeFromImage } from '../../../utils/recipeParser'
+import { prepareImageForCrop, prepareImagesForUpload } from '../../../utils/imageConverter'
+import { parseRecipeFromImages } from '../../../utils/recipeParser'
 
 async function cropAndConvert(
   imgElement: HTMLImageElement,
@@ -71,8 +71,8 @@ function FromPhotoPageInner() {
   const [steps, setSteps] = useState<StepInput[]>([{ description: '' }])
   const [categoryInput, setCategoryInput] = useState('')
   const [categories, setCategories] = useState<string[]>([])
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
+  const [imageItems, setImageItems] = useState<{ file: File; previewUrl: string }[]>([])
+  const [mainIndex, setMainIndex] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isParsing, setIsParsing] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
@@ -83,23 +83,101 @@ function FromPhotoPageInner() {
   const imgRef = useRef<HTMLImageElement>(null)
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 10 * 1024 * 1024) {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+    if (files.length > 5) {
+      setUploadError('写真は5枚以下で選択してください。')
+      return
+    }
+    if (files.some((f) => f.size > 10 * 1024 * 1024)) {
       setUploadError('ファイルサイズは10MB以下にしてください。')
       return
     }
     setUploadError(null)
     setParseError(null)
+
+    if (files.length === 1) {
+      // Single image: go through crop flow
+      setIsConverting(true)
+      try {
+        const url = await prepareImageForCrop(files[0])
+        setCropSrc(url)
+        setCrop(undefined)
+      } catch {
+        setUploadError('画像の変換に失敗しました。もう一度お試しください。')
+      } finally {
+        setIsConverting(false)
+      }
+    } else {
+      await mergeAndParseImages(files)
+    }
+  }
+
+  const handleAddImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+    if (files.some((f) => f.size > 10 * 1024 * 1024)) {
+      setUploadError('ファイルサイズは10MB以下にしてください。')
+      return
+    }
+    setUploadError(null)
+    setParseError(null)
+    // Always go through crop flow when adding one at a time
     setIsConverting(true)
     try {
-      const url = await prepareImageForCrop(file)
+      const url = await prepareImageForCrop(files[0])
       setCropSrc(url)
       setCrop(undefined)
     } catch {
       setUploadError('画像の変換に失敗しました。もう一度お試しください。')
     } finally {
       setIsConverting(false)
+    }
+  }
+
+  const mergeAndParseImages = async (files: File[]) => {
+    setIsConverting(true)
+    try {
+      const newItems = await prepareImagesForUpload(files)
+      setImageItems((prev) => [...prev, ...newItems].slice(0, 5))
+      const allFiles = [...imageItems, ...newItems].slice(0, 5).map((i) => i.file)
+      setIsParsing(true)
+      try {
+        const parsed = await parseRecipeFromImages(allFiles)
+        if (parsed.title !== null) setTitle(parsed.title)
+        if (parsed.description !== null) setDescription(parsed.description)
+        if (parsed.servings !== null) setServings(String(parsed.servings))
+        if (parsed.cookTime !== null) setCookTime(String(parsed.cookTime))
+        if (parsed.ingredients.length > 0) setIngredients(parsed.ingredients)
+        if (parsed.steps.length > 0) setSteps(parsed.steps.map((s) => ({ description: s })))
+      } catch {
+        setParseError('解析に失敗しました。もう一度お試しください。')
+      } finally {
+        setIsParsing(false)
+      }
+    } catch {
+      setUploadError('画像の変換に失敗しました。もう一度お試しください。')
+    } finally {
+      setIsConverting(false)
+    }
+  }
+
+  const handleParse = async () => {
+    if (imageItems.length === 0) return
+    setParseError(null)
+    setIsParsing(true)
+    try {
+      const parsed = await parseRecipeFromImages(imageItems.map((i) => i.file))
+      if (parsed.title !== null) setTitle(parsed.title)
+      if (parsed.description !== null) setDescription(parsed.description)
+      if (parsed.servings !== null) setServings(String(parsed.servings))
+      if (parsed.cookTime !== null) setCookTime(String(parsed.cookTime))
+      if (parsed.ingredients.length > 0) setIngredients(parsed.ingredients)
+      if (parsed.steps.length > 0) setSteps(parsed.steps.map((s) => ({ description: s })))
+    } catch {
+      setParseError('解析に失敗しました。もう一度お試しください。')
+    } finally {
+      setIsParsing(false)
     }
   }
 
@@ -115,36 +193,36 @@ function FromPhotoPageInner() {
 
   const handleCropConfirm = async () => {
     if (!imgRef.current || !cropSrc) return
-    // If no crop selected, use full image
     const activeCrop: Crop = crop ?? { unit: '%', x: 0, y: 0, width: 100, height: 100 }
-    setIsParsing(true)
     setCropSrc(null)
     try {
       const file = await cropAndConvert(imgRef.current, activeCrop)
-      setImageFile(file)
       const previewUrl = URL.createObjectURL(file)
-      setImagePreviewUrl(previewUrl)
-      const parsed = await parseRecipeFromImage(file)
-      if (parsed.title !== null) setTitle(parsed.title)
-      if (parsed.description !== null) setDescription(parsed.description)
-      if (parsed.servings !== null) setServings(String(parsed.servings))
-      if (parsed.cookTime !== null) setCookTime(String(parsed.cookTime))
-      if (parsed.ingredients.length > 0) setIngredients(parsed.ingredients)
-      if (parsed.steps.length > 0) setSteps(parsed.steps.map((s) => ({ description: s })))
+      setImageItems((prev) => [...prev, { file, previewUrl }].slice(0, 5))
     } catch {
-      setParseError('解析に失敗しました。もう一度お試しください。')
-    } finally {
-      setIsParsing(false)
+      setUploadError('画像の変換に失敗しました。もう一度お試しください。')
     }
   }
 
   const clearImage = () => {
-    setImageFile(null)
-    setImagePreviewUrl(null)
+    setImageItems([])
     setCropSrc(null)
     setCrop(undefined)
     setUploadError(null)
     setParseError(null)
+  }
+
+  const handleRemoveImage = (index: number) => {
+    setImageItems((prev) => {
+      URL.revokeObjectURL(prev[index].previewUrl)
+      const next = prev.filter((_, i) => i !== index)
+      return next
+    })
+    setMainIndex((prev) => {
+      if (index < prev) return prev - 1
+      if (index === prev) return 0
+      return prev
+    })
   }
 
   const addIngredient = () =>
@@ -182,25 +260,27 @@ function FromPhotoPageInner() {
     setError(null)
     startTransition(async () => {
       try {
-        let imageUrl: string | undefined
-        if (imageFile) {
+        const images: import('../../actions').RecipeImageInput[] = []
+        if (imageItems.length > 0) {
           const supabase = createClient()
           const { data: { user } } = await supabase.auth.getUser()
           if (!user) {
             setUploadError('セッションが切れました。再ログインしてください。')
             return
           }
-          const path = `photos/${user.id}/${crypto.randomUUID()}.jpg`
-          const { error: uploadErr } = await supabase.storage.from('recipe-images').upload(path, imageFile)
-          if (uploadErr) {
-            console.error('Storageアップロードエラー:', uploadErr)
-            setUploadError(`写真のアップロードに失敗しました。(${uploadErr.message})`)
-            return
+          for (let i = 0; i < imageItems.length; i++) {
+            const path = `photos/${user.id}/${crypto.randomUUID()}.jpg`
+            const { error: uploadErr } = await supabase.storage.from('recipe-images').upload(path, imageItems[i].file)
+            if (uploadErr) {
+              console.error('Storageアップロードエラー:', uploadErr)
+              setUploadError(`写真のアップロードに失敗しました。(${uploadErr.message})`)
+              return
+            }
+            const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
+            images.push({ url: publicUrl, isMain: i === mainIndex, order: i })
           }
-          const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
-          imageUrl = publicUrl
         }
-        await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories, imageUrl }, from)
+        await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories, images }, from)
       } catch (err) {
         if (isRedirectError(err)) throw err
         console.error('保存エラー:', err)
@@ -290,13 +370,36 @@ function FromPhotoPageInner() {
               </div>
             )}
 
-            {/* プレビュー（クロップ確定後） */}
-            {imagePreviewUrl && !cropSrc && (
+            {/* サムネイル一覧（画像選択済み・クロップUI非表示時） */}
+            {imageItems.length > 0 && !cropSrc && (
               <div className="space-y-3">
-                <div className="w-full aspect-video rounded-lg overflow-hidden bg-zinc-100">
-                  <img src={imagePreviewUrl} alt="プレビュー" className="w-full h-full object-cover" />
+                <p className="text-sm text-zinc-500">{imageItems.length}枚選択中</p>
+                <div className="flex flex-wrap gap-2">
+                  {imageItems.map((item, index) => (
+                    <div key={index} className="relative">
+                      <button
+                        type="button"
+                        aria-label={index === mainIndex ? 'メイン画像' : 'メインに設定'}
+                        onClick={() => setMainIndex(index)}
+                        className={`block w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${index === mainIndex ? 'border-zinc-900' : 'border-transparent'}`}
+                      >
+                        <img src={item.previewUrl} alt="プレビュー" className="w-full h-full object-cover" />
+                      </button>
+                      {index === mainIndex && (
+                        <span className="absolute top-0 left-0 text-xs bg-zinc-900 text-white px-1 rounded-tl-lg rounded-br-lg pointer-events-none">メイン</span>
+                      )}
+                      <button
+                        type="button"
+                        aria-label="削除"
+                        onClick={() => handleRemoveImage(index)}
+                        className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center leading-none"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                {isParsing && (
+                {isParsing ? (
                   <div className="flex items-center justify-center gap-2 text-sm text-zinc-500">
                     <svg className="animate-spin h-4 w-4 text-zinc-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -304,29 +407,50 @@ function FromPhotoPageInner() {
                     </svg>
                     画像読み取り中・・・
                   </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleParse}
+                    className="w-full py-2.5 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition-colors"
+                  >
+                    解析する
+                  </button>
                 )}
                 {parseError && (
                   <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
                     {parseError}
                   </p>
                 )}
-                <button
-                  type="button"
-                  onClick={clearImage}
-                  className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
-                >
-                  写真を削除
-                </button>
+                <div className="flex gap-3">
+                  <label className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer">
+                    写真を追加
+                    <input
+                      type="file"
+                      accept="image/*"
+                      aria-label="写真を追加"
+                      className="sr-only"
+                      onChange={handleAddImages}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={clearImage}
+                    className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+                  >
+                    写真を削除
+                  </button>
+                </div>
               </div>
             )}
 
             {/* ファイル選択UI */}
-            {!cropSrc && !imagePreviewUrl && !isConverting && (
+            {!cropSrc && imageItems.length === 0 && !isConverting && (
               <label className="flex flex-col items-center justify-center w-full h-32 rounded-lg border-2 border-dashed border-zinc-300 cursor-pointer hover:border-zinc-400 transition-colors">
                 <span className="text-sm text-zinc-500">タップして写真を選択</span>
                 <input
                   type="file"
                   accept="image/*"
+                  multiple
                   aria-label="写真を選択"
                   className="sr-only"
                   onChange={handleImageChange}
