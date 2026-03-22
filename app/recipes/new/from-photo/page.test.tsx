@@ -365,4 +365,26 @@ describe('FromPhotoPage', () => {
       })
     })
   })
+
+  it('1枚クロップ確定後に「写真を追加」で別の写真を追加すると合計2枚になる', async () => {
+    const user = userEvent.setup()
+    const file1 = new File(['a'], 'photo1.jpg', { type: 'image/jpeg' })
+    const file2 = new File(['b'], 'photo2.jpg', { type: 'image/jpeg' })
+    mockPrepareImagesForUpload.mockResolvedValue([
+      { file: file2, previewUrl: 'blob:mock2' },
+    ])
+    render(<FromPhotoPage />)
+
+    // 1枚目をクロップ確定して解析完了まで待つ
+    await uploadAndConfirmCrop(user, file1)
+    await waitFor(() => screen.getByDisplayValue('カレーライス'))
+    await waitFor(() => screen.getByText('1枚選択中'))
+
+    // 「写真を追加」で2枚目を追加
+    await user.upload(screen.getByLabelText('写真を追加'), file2)
+
+    await waitFor(() => {
+      expect(screen.getByText('2枚選択中')).toBeInTheDocument()
+    })
+  })
 })

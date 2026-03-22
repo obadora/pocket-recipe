@@ -108,30 +108,46 @@ function FromPhotoPageInner() {
         setIsConverting(false)
       }
     } else {
-      // Multiple images: skip crop, prepare all and parse
-      setIsConverting(true)
+      await mergeAndParseImages(files)
+    }
+  }
+
+  const handleAddImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+    if (files.some((f) => f.size > 10 * 1024 * 1024)) {
+      setUploadError('ファイルサイズは10MB以下にしてください。')
+      return
+    }
+    setUploadError(null)
+    setParseError(null)
+    await mergeAndParseImages(files)
+  }
+
+  const mergeAndParseImages = async (files: File[]) => {
+    setIsConverting(true)
+    try {
+      const newItems = await prepareImagesForUpload(files)
+      setImageItems((prev) => [...prev, ...newItems].slice(0, 5))
+      const allFiles = [...imageItems, ...newItems].slice(0, 5).map((i) => i.file)
+      setIsParsing(true)
       try {
-        const items = await prepareImagesForUpload(files)
-        setImageItems(items)
-        setIsParsing(true)
-        try {
-          const parsed = await parseRecipeFromImages(items.map((i) => i.file))
-          if (parsed.title !== null) setTitle(parsed.title)
-          if (parsed.description !== null) setDescription(parsed.description)
-          if (parsed.servings !== null) setServings(String(parsed.servings))
-          if (parsed.cookTime !== null) setCookTime(String(parsed.cookTime))
-          if (parsed.ingredients.length > 0) setIngredients(parsed.ingredients)
-          if (parsed.steps.length > 0) setSteps(parsed.steps.map((s) => ({ description: s })))
-        } catch {
-          setParseError('解析に失敗しました。もう一度お試しください。')
-        } finally {
-          setIsParsing(false)
-        }
+        const parsed = await parseRecipeFromImages(allFiles)
+        if (parsed.title !== null) setTitle(parsed.title)
+        if (parsed.description !== null) setDescription(parsed.description)
+        if (parsed.servings !== null) setServings(String(parsed.servings))
+        if (parsed.cookTime !== null) setCookTime(String(parsed.cookTime))
+        if (parsed.ingredients.length > 0) setIngredients(parsed.ingredients)
+        if (parsed.steps.length > 0) setSteps(parsed.steps.map((s) => ({ description: s })))
       } catch {
-        setUploadError('画像の変換に失敗しました。もう一度お試しください。')
+        setParseError('解析に失敗しました。もう一度お試しください。')
       } finally {
-        setIsConverting(false)
+        setIsParsing(false)
       }
+    } catch {
+      setUploadError('画像の変換に失敗しました。もう一度お試しください。')
+    } finally {
+      setIsConverting(false)
     }
   }
 
@@ -154,7 +170,7 @@ function FromPhotoPageInner() {
     try {
       const file = await cropAndConvert(imgRef.current, activeCrop)
       const previewUrl = URL.createObjectURL(file)
-      setImageItems([{ file, previewUrl }])
+      setImageItems((prev) => [...prev, { file, previewUrl }].slice(0, 5))
       const parsed = await parseRecipeFromImages([file])
       if (parsed.title !== null) setTitle(parsed.title)
       if (parsed.description !== null) setDescription(parsed.description)
@@ -372,7 +388,7 @@ function FromPhotoPageInner() {
                     multiple
                     aria-label="写真を追加"
                     className="sr-only"
-                    onChange={handleImageChange}
+                    onChange={handleAddImages}
                   />
                 </label>
                 <button
