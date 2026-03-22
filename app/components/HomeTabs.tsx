@@ -75,7 +75,7 @@ export default function HomeTabs({ recipes, mealRecords, user, recipeCount }: Ho
                 <form action={signOut}>
                   <button
                     type="submit"
-                    className="text-sm font-medium text-red-600 hover:text-red-800 transition-colors cursor-pointer"
+                    className="text-sm font-medium text-red-600 hover:text-red-800 active:text-red-900 transition-colors cursor-pointer"
                   >
                     ログアウト
                   </button>
@@ -97,7 +97,7 @@ export default function HomeTabs({ recipes, mealRecords, user, recipeCount }: Ho
               key={key}
               type="button"
               onClick={() => setActiveTab(key)}
-              className={`px-5 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${activeTab === key ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+              className={`px-5 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${activeTab === key ? 'bg-zinc-900 text-white active:bg-zinc-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 active:bg-zinc-300'}`}
             >
               {label}
             </button>

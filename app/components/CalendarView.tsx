@@ -109,6 +109,7 @@ export default function CalendarView({ mealRecords, recipes: _recipes, initialMo
     const base = initialMonth ?? new Date()
     return new Date(base.getFullYear(), base.getMonth(), 1)
   })
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null)
 
   const year = currentMonth.getFullYear()
   const month = currentMonth.getMonth()
@@ -128,6 +129,14 @@ export default function CalendarView({ mealRecords, recipes: _recipes, initialMo
   const goToPrevMonth = () => setCurrentMonth(new Date(year, month - 1, 1))
   const goToNextMonth = () => setCurrentMonth(new Date(year, month + 1, 1))
 
+  const handleCellClick = (dateKey: string) => {
+    if (selectedDateKey === dateKey) {
+      router.push(`/calendar/${dateKey}`)
+    } else {
+      setSelectedDateKey(dateKey)
+    }
+  }
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Month navigation */}
@@ -136,7 +145,7 @@ export default function CalendarView({ mealRecords, recipes: _recipes, initialMo
           type="button"
           aria-label="前月"
           onClick={goToPrevMonth}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200 transition-colors cursor-pointer"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           前月
@@ -148,7 +157,7 @@ export default function CalendarView({ mealRecords, recipes: _recipes, initialMo
           type="button"
           aria-label="翌月"
           onClick={goToNextMonth}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200 transition-colors cursor-pointer"
         >
           翌月
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -176,13 +185,15 @@ export default function CalendarView({ mealRecords, recipes: _recipes, initialMo
           const dayRecords = cell.isCurrentMonth ? (recordsByDate[cell.dateKey] ?? []) : []
           const dayColor = getDayColor(cell.dayOfWeek, cell.holidayName, cell.isCurrentMonth)
 
+          const isSelected = selectedDateKey === cell.dateKey
+
           return (
             <button
               key={cell.dateKey}
               type="button"
               data-testid={`cell-${cell.dateKey}`}
-              onClick={() => router.push(`/calendar/${cell.dateKey}`)}
-              className="bg-white p-1 flex flex-col items-center transition-colors hover:bg-zinc-50 cursor-pointer"
+              onClick={() => handleCellClick(cell.dateKey)}
+              className={`p-1 flex flex-col items-center transition-colors cursor-pointer ${isSelected ? 'bg-zinc-100' : 'bg-white hover:bg-zinc-50 active:bg-zinc-100'}`}
             >
               <span className={`text-xs mb-0.5 ${dayColor}`}>{cell.day}</span>
               {cell.holidayName && (

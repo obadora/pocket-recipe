@@ -179,7 +179,7 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
           <button
             type="button"
             onClick={() => router.back()}
-            className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+            className="text-sm text-zinc-500 hover:text-zinc-900 px-2 py-1 rounded-lg hover:bg-zinc-100 active:bg-zinc-200 transition-colors"
           >
             ← 戻る
           </button>
@@ -239,7 +239,7 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
             )}
 
             {!imagePreviewUrl && (
-              <label className="flex flex-col items-center justify-center w-full h-32 rounded-lg border-2 border-dashed border-zinc-300 cursor-pointer hover:border-zinc-400 transition-colors">
+              <label className="flex flex-col items-center justify-center w-full h-32 rounded-lg border-2 border-dashed border-zinc-300 cursor-pointer hover:border-zinc-400 active:bg-zinc-50 transition-colors">
                 <span className="text-sm text-zinc-500">タップして写真を追加</span>
                 <input
                   type="file"
@@ -324,7 +324,7 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
               <button
                 type="button"
                 onClick={addCategory}
-                className="px-4 py-2 text-sm font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 transition-colors"
+                className="px-4 py-2 text-sm font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 active:bg-zinc-800 transition-colors"
               >
                 追加
               </button>
@@ -334,7 +334,7 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
                 {categories.map((cat) => (
                   <span key={cat} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm bg-zinc-100 text-zinc-700">
                     {cat}
-                    <button type="button" onClick={() => removeCategory(cat)} className="text-zinc-400 hover:text-zinc-700 transition-colors leading-none">×</button>
+                    <button type="button" onClick={() => removeCategory(cat)} className="text-zinc-400 hover:text-zinc-700 active:text-zinc-900 transition-colors leading-none">×</button>
                   </span>
                 ))}
               </div>
@@ -369,12 +369,12 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
                     className="w-20 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
                   />
                   {ingredients.length > 1 && (
-                    <button type="button" onClick={() => removeIngredient(index)} className="text-zinc-400 hover:text-red-500 transition-colors text-lg leading-none">×</button>
+                    <button type="button" onClick={() => removeIngredient(index)} className="text-zinc-400 hover:text-red-500 active:text-red-600 transition-colors text-lg leading-none">×</button>
                   )}
                 </div>
               ))}
             </div>
-            <button type="button" onClick={addIngredient} className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
+            <button type="button" onClick={addIngredient} className="text-sm text-zinc-500 hover:text-zinc-900 active:text-zinc-700 transition-colors">
               + 材料を追加
             </button>
           </section>
@@ -396,12 +396,12 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
                     className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 resize-none"
                   />
                   {steps.length > 1 && (
-                    <button type="button" onClick={() => removeStep(index)} className="mt-2.5 text-zinc-400 hover:text-red-500 transition-colors text-lg leading-none">×</button>
+                    <button type="button" onClick={() => removeStep(index)} className="mt-2.5 text-zinc-400 hover:text-red-500 active:text-red-600 transition-colors text-lg leading-none">×</button>
                   )}
                 </div>
               ))}
             </div>
-            <button type="button" onClick={addStep} className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
+            <button type="button" onClick={addStep} className="text-sm text-zinc-500 hover:text-zinc-900 active:text-zinc-700 transition-colors">
               + 手順を追加
             </button>
           </section>
@@ -411,14 +411,14 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
             <button
               type="button"
               onClick={() => router.back()}
-              className="flex-1 py-3 rounded-xl border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              className="flex-1 py-3 rounded-xl border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
             >
               キャンセル
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="flex-1 py-3 rounded-xl bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 py-3 rounded-xl bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 active:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isPending ? '保存中...' : '変更を保存'}
             </button>

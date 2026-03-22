@@ -117,7 +117,7 @@ export default function MealDateClient({ date, recipes, mealRecords }: Props) {
                 <li key={r.id} data-testid={`registered-${r.recipeId}`} className="relative group">
                   <Link
                     href={`/recipes/${r.recipeId}`}
-                    className="flex flex-col bg-white rounded-xl border border-zinc-200 hover:border-zinc-400 transition-colors overflow-hidden h-full"
+                    className="flex flex-col bg-white rounded-xl border border-zinc-200 hover:border-zinc-400 active:bg-zinc-50 transition-colors overflow-hidden h-full"
                   >
                     {recipe?.images[0]?.url ? (
                       <div className="relative aspect-square w-full">
@@ -138,7 +138,7 @@ export default function MealDateClient({ date, recipes, mealRecords }: Props) {
                     aria-label="削除"
                     disabled={isPending}
                     onClick={() => handleDelete(r.id)}
-                    className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-white/90 text-red-500 hover:text-red-700 text-xs shadow disabled:opacity-50 cursor-pointer"
+                    className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-white/90 text-red-500 hover:text-red-700 active:text-red-800 text-xs shadow disabled:opacity-50 cursor-pointer"
                   >
                     ✕
                   </button>
@@ -162,19 +162,19 @@ export default function MealDateClient({ date, recipes, mealRecords }: Props) {
         <div className="flex gap-2 mb-4">
           <Link
             href={`/recipes/new?from=/calendar/${date}`}
-            className="flex-1 text-center px-3 py-2 text-xs font-medium border border-zinc-300 rounded-lg text-zinc-700 hover:bg-zinc-50 transition-colors"
+            className="flex-1 text-center px-3 py-2 text-xs font-medium border border-zinc-300 rounded-lg text-zinc-700 hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
           >
             手動で作成
           </Link>
           <Link
             href={`/recipes/new/from-url?from=/calendar/${date}`}
-            className="flex-1 text-center px-3 py-2 text-xs font-medium border border-zinc-300 rounded-lg text-zinc-700 hover:bg-zinc-50 transition-colors"
+            className="flex-1 text-center px-3 py-2 text-xs font-medium border border-zinc-300 rounded-lg text-zinc-700 hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
           >
             URLから作成
           </Link>
           <Link
             href={`/recipes/new/from-photo?from=/calendar/${date}`}
-            className="flex-1 text-center px-3 py-2 text-xs font-medium border border-zinc-300 rounded-lg text-zinc-700 hover:bg-zinc-50 transition-colors"
+            className="flex-1 text-center px-3 py-2 text-xs font-medium border border-zinc-300 rounded-lg text-zinc-700 hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
           >
             写真から作成
           </Link>
@@ -206,7 +206,7 @@ export default function MealDateClient({ date, recipes, mealRecords }: Props) {
                           aria-label="追加"
                           disabled={isPending}
                           onClick={() => handleAddClick(recipe.id)}
-                          className="w-full px-2 py-1 text-xs font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 disabled:opacity-50 cursor-pointer"
+                          className="w-full px-2 py-1 text-xs font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 active:bg-zinc-800 disabled:opacity-50 cursor-pointer"
                         >
                           追加
                         </button>
@@ -217,14 +217,14 @@ export default function MealDateClient({ date, recipes, mealRecords }: Props) {
                           <button
                             type="button"
                             onClick={() => handleSelectType('ate')}
-                            className="flex-1 px-2 py-1 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer"
+                            className="flex-1 px-2 py-1 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 cursor-pointer"
                           >
                             食べた
                           </button>
                           <button
                             type="button"
                             onClick={() => handleSelectType('cooked')}
-                            className="flex-1 px-2 py-1 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 cursor-pointer"
+                            className="flex-1 px-2 py-1 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 cursor-pointer"
                           >
                             作った
                           </button>
@@ -238,7 +238,7 @@ export default function MealDateClient({ date, recipes, mealRecords }: Props) {
                               key={key}
                               type="button"
                               onClick={() => handleSelectMealTime(key)}
-                              className="flex-1 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 cursor-pointer"
+                              className="flex-1 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 active:bg-blue-300 cursor-pointer"
                             >
                               {label}
                             </button>

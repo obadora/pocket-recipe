@@ -30,7 +30,7 @@ export default function ImageGallery({ images, alt }: Props) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="relative w-full aspect-[4/3] rounded-xl overflow-hidden cursor-zoom-in block"
+          className="relative w-full aspect-[4/3] rounded-xl overflow-hidden cursor-zoom-in block active:opacity-90 transition-opacity"
         >
           <Image
             src={activeImage.url}
@@ -50,7 +50,7 @@ export default function ImageGallery({ images, alt }: Props) {
                 key={img.url}
                 type="button"
                 onClick={() => setActiveIndex(index)}
-                className={`relative flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-colors ${index === activeIndex ? 'border-zinc-900' : 'border-transparent'}`}
+                className={`relative flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-colors active:opacity-80 ${index === activeIndex ? 'border-zinc-900' : 'border-transparent'}`}
               >
                 <Image
                   src={img.url}
@@ -73,7 +73,7 @@ export default function ImageGallery({ images, alt }: Props) {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="self-end text-white text-sm hover:text-zinc-300 transition-colors cursor-pointer"
+            className="self-end text-white text-sm hover:text-zinc-300 active:text-zinc-400 transition-colors cursor-pointer"
           >
             閉じる ✕
           </button>
@@ -93,7 +93,7 @@ export default function ImageGallery({ images, alt }: Props) {
                   key={img.url}
                   type="button"
                   onClick={() => setActiveIndex(index)}
-                  className={`relative flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-colors ${index === activeIndex ? 'border-white' : 'border-white/30'}`}
+                  className={`relative flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-colors active:opacity-80 ${index === activeIndex ? 'border-white' : 'border-white/30'}`}
                 >
                   <Image
                     src={img.url}
