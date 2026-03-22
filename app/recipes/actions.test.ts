@@ -13,6 +13,9 @@ const {
   mockIngredientCreateMany,
   mockStepCreateMany,
   mockRecipeCategoryCreateMany,
+  mockRecipeImageDeleteMany,
+  mockRecipeImageCreateMany,
+  mockRecipeImageFindMany,
   mockTransaction,
   mockRedirect,
   mockStorageRemove,
@@ -32,6 +35,9 @@ const {
   mockIngredientCreateMany: vi.fn(),
   mockStepCreateMany: vi.fn(),
   mockRecipeCategoryCreateMany: vi.fn(),
+  mockRecipeImageDeleteMany: vi.fn(),
+  mockRecipeImageCreateMany: vi.fn(),
+  mockRecipeImageFindMany: vi.fn(),
   mockTransaction: vi.fn(),
   mockRedirect: vi.fn(),
   mockStorageRemove: vi.fn(),
@@ -60,6 +66,7 @@ vi.mock('../../lib/prisma', () => ({
     ingredient: { deleteMany: mockIngredientDeleteMany, createMany: mockIngredientCreateMany },
     step: { deleteMany: mockStepDeleteMany, createMany: mockStepCreateMany },
     recipeCategory: { deleteMany: mockRecipeCategoryDeleteMany, createMany: mockRecipeCategoryCreateMany },
+    recipeImage: { deleteMany: mockRecipeImageDeleteMany, createMany: mockRecipeImageCreateMany, findMany: mockRecipeImageFindMany },
     mealRecord: { create: mockMealRecordCreate },
     $transaction: mockTransaction,
   },
@@ -102,9 +109,7 @@ describe('createRecipe', () => {
   })
 
   it('成功時: prisma.recipe.create を呼び、/ にリダイレクトする', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-1' } },
-    })
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
 
     await createRecipe(baseInput)
@@ -122,52 +127,40 @@ describe('createRecipe', () => {
   })
 
   it('servings・cookTime が数値文字列の場合: parseInt して渡す', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-1' } },
-    })
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
 
     await createRecipe({ ...baseInput, servings: '4', cookTime: '30' })
 
     expect(mockRecipeCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          servings: 4,
-          cookTime: 30,
-        }),
+        data: expect.objectContaining({ servings: 4, cookTime: 30 }),
       })
     )
   })
 
   it('servings・cookTime が空文字の場合: null を渡す', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-1' } },
-    })
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
 
     await createRecipe({ ...baseInput, servings: '', cookTime: '' })
 
     expect(mockRecipeCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          servings: null,
-          cookTime: null,
-        }),
+        data: expect.objectContaining({ servings: null, cookTime: null }),
       })
     )
   })
 
   it('name が空の材料はフィルタリングされる', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-1' } },
-    })
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
 
     await createRecipe({
       ...baseInput,
       ingredients: [
         { name: 'じゃがいも', amount: '2', unit: '個' },
-        { name: '  ', amount: '', unit: '' }, // 空白のみ → フィルタ対象
+        { name: '  ', amount: '', unit: '' },
       ],
     })
 
@@ -177,17 +170,12 @@ describe('createRecipe', () => {
   })
 
   it('description が空の手順はフィルタリングされる', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-1' } },
-    })
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
 
     await createRecipe({
       ...baseInput,
-      steps: [
-        { description: '具材を炒める' },
-        { description: '' }, // 空 → フィルタ対象
-      ],
+      steps: [{ description: '具材を炒める' }, { description: '' }],
     })
 
     const createCall = mockRecipeCreate.mock.calls[0][0]
@@ -196,9 +184,7 @@ describe('createRecipe', () => {
   })
 
   it('材料の order は配列インデックス順になる', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-1' } },
-    })
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
 
     await createRecipe({
@@ -218,9 +204,7 @@ describe('createRecipe', () => {
   })
 
   it('カテゴリがある場合: prisma.category.upsert を呼ぶ', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-1' } },
-    })
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockCategoryUpsert
       .mockResolvedValueOnce({ id: 'cat-1' })
       .mockResolvedValueOnce({ id: 'cat-2' })
@@ -241,25 +225,77 @@ describe('createRecipe', () => {
     ])
   })
 
-  it('外部imageUrlのfetchが失敗した場合: imageUrlがnullになる', async () => {
+  it('images なしの場合: images.create が空になる', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: false } as Response)
 
-    await createRecipe({ ...baseInput, imageUrl: 'https://example.com/photo.jpg', sourceType: 'url', sourceUrl: 'https://example.com/recipe' })
+    await createRecipe(baseInput)
 
-    // fetch失敗時はimageUrlがnullになるが、sourceTypeはurlのまま
-    expect(mockRecipeCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          imageUrl: null,
-          sourceType: 'url',
-        }),
-      })
-    )
+    const createCall = mockRecipeCreate.mock.calls[0][0]
+    expect(createCall.data.images.create).toHaveLength(0)
+    expect(createCall.data).not.toHaveProperty('imageUrl')
   })
 
-  it('外部imageUrlのバケット保存が成功した場合: バケットURLとsourceType photoで保存される', async () => {
+  it('images 1枚の場合: isMain:true で1レコード作成される', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
+
+    await createRecipe({
+      ...baseInput,
+      images: [{ url: 'https://example.com/photo.jpg', isMain: true, order: 0 }],
+    })
+
+    const createCall = mockRecipeCreate.mock.calls[0][0]
+    expect(createCall.data.images.create).toHaveLength(1)
+    expect(createCall.data.images.create[0]).toEqual({
+      url: 'https://example.com/photo.jpg',
+      isMain: true,
+      order: 0,
+    })
+  })
+
+  it('images 複数枚の場合: 渡された isMain がそのまま保存される', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
+
+    await createRecipe({
+      ...baseInput,
+      images: [
+        { url: 'https://example.com/photo1.jpg', isMain: true, order: 0 },
+        { url: 'https://example.com/photo2.jpg', isMain: false, order: 1 },
+      ],
+    })
+
+    const createCall = mockRecipeCreate.mock.calls[0][0]
+    expect(createCall.data.images.create).toHaveLength(2)
+    expect(createCall.data.images.create[0].isMain).toBe(true)
+    expect(createCall.data.images.create[1].isMain).toBe(false)
+  })
+
+  it('images がある場合: sourceType が photo になる', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
+
+    await createRecipe({
+      ...baseInput,
+      images: [{ url: 'https://example.com/photo.jpg', isMain: true, order: 0 }],
+    })
+
+    const createCall = mockRecipeCreate.mock.calls[0][0]
+    expect(createCall.data.sourceType).toBe('photo')
+  })
+
+  it('images なしの場合: sourceType が manual になる', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
+
+    await createRecipe(baseInput)
+
+    const createCall = mockRecipeCreate.mock.calls[0][0]
+    expect(createCall.data.sourceType).toBe('manual')
+  })
+
+  it('外部URLの画像(sourceType:url)の場合: Storageにアップロードしてimagesに保存される', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({
@@ -271,40 +307,43 @@ describe('createRecipe', () => {
       data: { publicUrl: 'https://project.supabase.co/storage/v1/object/public/recipe-images/url-imports/user-1/uuid.jpg' },
     })
 
-    await createRecipe({ ...baseInput, imageUrl: 'https://example.com/photo.jpg' })
+    await createRecipe({
+      ...baseInput,
+      images: [{ url: 'https://example.com/photo.jpg', isMain: true, order: 0 }],
+      sourceType: 'url',
+      sourceUrl: 'https://example.com/recipe',
+    })
 
     expect(mockStorageUpload).toHaveBeenCalledWith(
       expect.stringMatching(/^url-imports\/user-1\/.+\.jpg$/),
       expect.anything(),
       expect.anything()
     )
-    expect(mockRecipeCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          imageUrl: 'https://project.supabase.co/storage/v1/object/public/recipe-images/url-imports/user-1/uuid.jpg',
-          sourceType: 'photo',
-        }),
-      })
+    const createCall = mockRecipeCreate.mock.calls[0][0]
+    expect(createCall.data.images.create[0].url).toBe(
+      'https://project.supabase.co/storage/v1/object/public/recipe-images/url-imports/user-1/uuid.jpg'
     )
+    expect(createCall.data.sourceType).toBe('url')
   })
 
-  it('imageUrl が未指定の場合: sourceType が manual、imageUrl が null になる', async () => {
+  it('外部URLのfetchが失敗した場合: imagesは空になる', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: false } as Response)
 
-    await createRecipe(baseInput)
+    await createRecipe({
+      ...baseInput,
+      images: [{ url: 'https://example.com/photo.jpg', isMain: true, order: 0 }],
+      sourceType: 'url',
+      sourceUrl: 'https://example.com/recipe',
+    })
 
-    expect(mockRecipeCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          imageUrl: null,
-          sourceType: 'manual',
-        }),
-      })
-    )
+    const createCall = mockRecipeCreate.mock.calls[0][0]
+    expect(createCall.data.images.create).toHaveLength(0)
+    expect(createCall.data.sourceType).toBe('url')
   })
 
-  it('sourceType が url の場合: sourceType が url、sourceUrl が渡される', async () => {
+  it('sourceType が url の場合: sourceUrl が渡される', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
 
@@ -321,15 +360,12 @@ describe('createRecipe', () => {
   })
 
   it('空文字カテゴリはスキップする', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-1' } },
-    })
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockCategoryUpsert.mockResolvedValue({ id: 'cat-1' })
     mockRecipeCreate.mockResolvedValue({ id: 'recipe-abc' })
 
     await createRecipe({ ...baseInput, categories: ['和食', '  ', ''] })
 
-    // '  ' と '' はスキップされるので upsert は1回のみ
     expect(mockCategoryUpsert).toHaveBeenCalledTimes(1)
     expect(mockCategoryUpsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { name: '和食' } })
@@ -393,10 +429,12 @@ describe('updateRecipe', () => {
     mockIngredientDeleteMany.mockResolvedValue({})
     mockStepDeleteMany.mockResolvedValue({})
     mockRecipeCategoryDeleteMany.mockResolvedValue({})
+    mockRecipeImageDeleteMany.mockResolvedValue({})
     mockRecipeUpdate.mockResolvedValue({ id: 'recipe-1' })
     mockIngredientCreateMany.mockResolvedValue({})
     mockStepCreateMany.mockResolvedValue({})
     mockRecipeCategoryCreateMany.mockResolvedValue({})
+    mockRecipeImageCreateMany.mockResolvedValue({})
   })
 
   it('未認証の場合: /login にリダイレクトし $transaction を呼ばない', async () => {
@@ -493,23 +531,38 @@ describe('updateRecipe', () => {
     expect(createCall.data).toHaveLength(1)
   })
 
-  it('imageUrl が渡された場合: sourceType が photo になる', async () => {
+  it('images がある場合: recipeImage.deleteMany → createMany が呼ばれる', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
 
-    await updateRecipe('recipe-1', { ...baseInput, imageUrl: 'https://example.com/photo.jpg' })
+    await updateRecipe('recipe-1', {
+      ...baseInput,
+      images: [{ url: 'https://example.com/photo.jpg', isMain: true, order: 0 }],
+    })
+
+    expect(mockRecipeImageDeleteMany).toHaveBeenCalledWith({ where: { recipeId: 'recipe-1' } })
+    expect(mockRecipeImageCreateMany).toHaveBeenCalledWith({
+      data: [{ recipeId: 'recipe-1', url: 'https://example.com/photo.jpg', isMain: true, order: 0 }],
+    })
+  })
+
+  it('images がある場合: sourceType が photo になる', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+
+    await updateRecipe('recipe-1', {
+      ...baseInput,
+      images: [{ url: 'https://example.com/photo.jpg', isMain: true, order: 0 }],
+    })
 
     expect(mockRecipeUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          imageUrl: 'https://example.com/photo.jpg',
-          sourceType: 'photo',
-        }),
+        data: expect.objectContaining({ sourceType: 'photo' }),
       })
     )
   })
 
-  it('imageUrl が未指定の場合: sourceType が manual、imageUrl が null になる', async () => {
+  it('images なしの場合: sourceType が manual になる', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
 
@@ -517,12 +570,24 @@ describe('updateRecipe', () => {
 
     expect(mockRecipeUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          imageUrl: null,
-          sourceType: 'manual',
-        }),
+        data: expect.objectContaining({ sourceType: 'manual' }),
       })
     )
+  })
+
+  it('deletedImageUrls がある場合: Storage から削除する', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+    mockStorageRemove.mockResolvedValue({ error: null })
+
+    await updateRecipe('recipe-1', {
+      ...baseInput,
+      deletedImageUrls: [
+        'https://project.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/uuid.jpg',
+      ],
+    })
+
+    expect(mockStorageRemove).toHaveBeenCalledWith(['photos/user-1/uuid.jpg'])
   })
 
   it('カテゴリがある場合: prisma.category.upsert を呼ぶ', async () => {
@@ -570,37 +635,39 @@ describe('deleteRecipe', () => {
 
   it('自分のレシピの場合: prisma.recipe.delete を呼び / にリダイレクトする', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1', imageUrl: null })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+    mockRecipeImageFindMany.mockResolvedValue([])
     mockRecipeDelete.mockResolvedValue({})
 
     await deleteRecipe('recipe-1')
 
-    expect(mockRecipeFindFirst).toHaveBeenCalledWith({
-      where: { id: 'recipe-1', userId: 'user-1' },
-    })
     expect(mockRecipeDelete).toHaveBeenCalledWith({ where: { id: 'recipe-1' } })
     expect(mockRedirect).toHaveBeenCalledWith('/')
   })
 
-  it('imageUrl がある場合: Storage からファイルを削除する', async () => {
+  it('RecipeImage がある場合: 全URLをStorageから削除する', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockRecipeFindFirst.mockResolvedValue({
-      id: 'recipe-1',
-      userId: 'user-1',
-      imageUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/user-1/uuid.jpg',
-    })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+    mockRecipeImageFindMany.mockResolvedValue([
+      { url: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/img1.jpg' },
+      { url: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/img2.jpg' },
+    ])
     mockRecipeDelete.mockResolvedValue({})
     mockStorageRemove.mockResolvedValue({ error: null })
 
     await deleteRecipe('recipe-1')
 
-    expect(mockStorageRemove).toHaveBeenCalledWith(['user-1/uuid.jpg'])
+    expect(mockStorageRemove).toHaveBeenCalledWith([
+      'photos/user-1/img1.jpg',
+      'photos/user-1/img2.jpg',
+    ])
     expect(mockRecipeDelete).toHaveBeenCalledWith({ where: { id: 'recipe-1' } })
   })
 
-  it('imageUrl がない場合: Storage の削除は呼ばない', async () => {
+  it('RecipeImage がない場合: Storageの削除は呼ばない', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1', imageUrl: null })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+    mockRecipeImageFindMany.mockResolvedValue([])
     mockRecipeDelete.mockResolvedValue({})
 
     await deleteRecipe('recipe-1')
@@ -610,17 +677,15 @@ describe('deleteRecipe', () => {
 
   it('url-imports パスの画像がある場合: バケットから正しいパスで削除する', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockRecipeFindFirst.mockResolvedValue({
-      id: 'recipe-1',
-      userId: 'user-1',
-      imageUrl: 'https://project.supabase.co/storage/v1/object/public/recipe-images/url-imports/user-1/uuid.jpg',
-    })
+    mockRecipeFindFirst.mockResolvedValue({ id: 'recipe-1', userId: 'user-1' })
+    mockRecipeImageFindMany.mockResolvedValue([
+      { url: 'https://project.supabase.co/storage/v1/object/public/recipe-images/url-imports/user-1/uuid.jpg' },
+    ])
     mockRecipeDelete.mockResolvedValue({})
     mockStorageRemove.mockResolvedValue({ error: null })
 
     await deleteRecipe('recipe-1')
 
     expect(mockStorageRemove).toHaveBeenCalledWith(['url-imports/user-1/uuid.jpg'])
-    expect(mockRecipeDelete).toHaveBeenCalledWith({ where: { id: 'recipe-1' } })
   })
 })

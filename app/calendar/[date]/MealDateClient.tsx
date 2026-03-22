@@ -12,7 +12,7 @@ type Recipe = {
   description: string | null
   servings: number | null
   cookTime: number | null
-  imageUrl: string | null
+  images: Array<{ url: string; isMain: boolean; order: number }>
   categories: Array<{ category: { id: string; name: string } }>
 }
 
@@ -119,9 +119,9 @@ export default function MealDateClient({ date, recipes, mealRecords }: Props) {
                     href={`/recipes/${r.recipeId}`}
                     className="flex flex-col bg-white rounded-xl border border-zinc-200 hover:border-zinc-400 transition-colors overflow-hidden h-full"
                   >
-                    {recipe?.imageUrl ? (
+                    {recipe?.images[0]?.url ? (
                       <div className="relative aspect-square w-full">
-                        <Image src={recipe.imageUrl} alt={r.recipe.title} fill className="object-cover" sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" />
+                        <Image src={recipe.images[0].url} alt={r.recipe.title} fill className="object-cover" sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" />
                       </div>
                     ) : (
                       <div className="aspect-square w-full bg-zinc-100 flex items-center justify-center">
@@ -188,9 +188,9 @@ export default function MealDateClient({ date, recipes, mealRecords }: Props) {
               return (
                 <li key={recipe.id} className="relative">
                   <div className="flex flex-col bg-white rounded-xl border border-zinc-200 overflow-hidden h-full">
-                    {recipe.imageUrl ? (
+                    {recipe.images[0]?.url ? (
                       <div className="relative aspect-square w-full">
-                        <Image src={recipe.imageUrl} alt={recipe.title} fill className="object-cover" sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" />
+                        <Image src={recipe.images[0].url} alt={recipe.title} fill className="object-cover" sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" />
                       </div>
                     ) : (
                       <div className="aspect-square w-full bg-zinc-100 flex items-center justify-center">

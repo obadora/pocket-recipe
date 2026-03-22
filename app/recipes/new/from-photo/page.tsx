@@ -72,6 +72,7 @@ function FromPhotoPageInner() {
   const [categoryInput, setCategoryInput] = useState('')
   const [categories, setCategories] = useState<string[]>([])
   const [imageItems, setImageItems] = useState<{ file: File; previewUrl: string }[]>([])
+  const [mainIndex, setMainIndex] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isParsing, setIsParsing] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
@@ -214,7 +215,13 @@ function FromPhotoPageInner() {
   const handleRemoveImage = (index: number) => {
     setImageItems((prev) => {
       URL.revokeObjectURL(prev[index].previewUrl)
-      return prev.filter((_, i) => i !== index)
+      const next = prev.filter((_, i) => i !== index)
+      return next
+    })
+    setMainIndex((prev) => {
+      if (index < prev) return prev - 1
+      if (index === prev) return 0
+      return prev
     })
   }
 
@@ -253,26 +260,27 @@ function FromPhotoPageInner() {
     setError(null)
     startTransition(async () => {
       try {
-        let imageUrl: string | undefined
-        const mainImageFile = imageItems[0]?.file ?? null
-        if (mainImageFile) {
+        const images: import('../../actions').RecipeImageInput[] = []
+        if (imageItems.length > 0) {
           const supabase = createClient()
           const { data: { user } } = await supabase.auth.getUser()
           if (!user) {
             setUploadError('セッションが切れました。再ログインしてください。')
             return
           }
-          const path = `photos/${user.id}/${crypto.randomUUID()}.jpg`
-          const { error: uploadErr } = await supabase.storage.from('recipe-images').upload(path, mainImageFile)
-          if (uploadErr) {
-            console.error('Storageアップロードエラー:', uploadErr)
-            setUploadError(`写真のアップロードに失敗しました。(${uploadErr.message})`)
-            return
+          for (let i = 0; i < imageItems.length; i++) {
+            const path = `photos/${user.id}/${crypto.randomUUID()}.jpg`
+            const { error: uploadErr } = await supabase.storage.from('recipe-images').upload(path, imageItems[i].file)
+            if (uploadErr) {
+              console.error('Storageアップロードエラー:', uploadErr)
+              setUploadError(`写真のアップロードに失敗しました。(${uploadErr.message})`)
+              return
+            }
+            const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
+            images.push({ url: publicUrl, isMain: i === mainIndex, order: i })
           }
-          const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
-          imageUrl = publicUrl
         }
-        await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories, imageUrl }, from)
+        await createRecipe({ title, description, servings, cookTime, ingredients, steps, categories, images }, from)
       } catch (err) {
         if (isRedirectError(err)) throw err
         console.error('保存エラー:', err)
@@ -369,9 +377,16 @@ function FromPhotoPageInner() {
                 <div className="flex flex-wrap gap-2">
                   {imageItems.map((item, index) => (
                     <div key={index} className="relative">
-                      <img src={item.previewUrl} alt="プレビュー" className="w-20 h-20 object-cover rounded-lg" />
-                      {index === 0 && (
-                        <span className="absolute top-0 left-0 text-xs bg-zinc-900 text-white px-1 rounded-tl-lg rounded-br-lg">メイン</span>
+                      <button
+                        type="button"
+                        aria-label={index === mainIndex ? 'メイン画像' : 'メインに設定'}
+                        onClick={() => setMainIndex(index)}
+                        className={`block w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${index === mainIndex ? 'border-zinc-900' : 'border-transparent'}`}
+                      >
+                        <img src={item.previewUrl} alt="プレビュー" className="w-full h-full object-cover" />
+                      </button>
+                      {index === mainIndex && (
+                        <span className="absolute top-0 left-0 text-xs bg-zinc-900 text-white px-1 rounded-tl-lg rounded-br-lg pointer-events-none">メイン</span>
                       )}
                       <button
                         type="button"

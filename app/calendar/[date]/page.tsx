@@ -33,7 +33,7 @@ export default async function CalendarDatePage({ params }: Props) {
         description: true,
         servings: true,
         cookTime: true,
-        imageUrl: true,
+        images: { where: { isMain: true }, take: 1 },
         categories: { include: { category: true } },
       },
     }),

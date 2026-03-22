@@ -13,7 +13,7 @@ type Recipe = {
   description: string | null
   servings: number | null
   cookTime: number | null
-  imageUrl: string | null
+  images: Array<{ url: string; isMain: boolean; order: number }>
   categories: Array<{ category: { id: string; name: string } }>
 }
 

@@ -7,7 +7,7 @@ type Recipe = {
   description: string | null
   servings: number | null
   cookTime: number | null
-  imageUrl: string | null
+  images: Array<{ url: string; isMain: boolean; order: number }>
   categories: Array<{ category: { id: string; name: string } }>
 }
 
@@ -33,10 +33,10 @@ export default function RecipeList({ recipes }: RecipeListProps) {
             href={`/recipes/${recipe.id}`}
             className="flex flex-col bg-white rounded-xl border border-zinc-200 hover:border-zinc-400 transition-colors overflow-hidden h-full"
           >
-            {recipe.imageUrl ? (
+            {recipe.images[0]?.url ? (
               <div className="relative aspect-square w-full">
                 <Image
-                  src={recipe.imageUrl}
+                  src={recipe.images[0].url}
                   alt={recipe.title}
                   fill
                   className="object-cover"

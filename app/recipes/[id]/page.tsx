@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { createClient } from '../../utils/supabase/server'
 import { prisma } from '../../../lib/prisma'
 import DeleteButton from './DeleteButton'
-import ImageModal from './ImageModal'
+import ImageGallery from './ImageGallery'
 import BackButton from './BackButton'
 
 type Props = {
@@ -22,6 +22,7 @@ export default async function RecipeDetailPage({ params }: Props) {
       ingredients: { orderBy: { order: 'asc' } },
       steps: { orderBy: { order: 'asc' } },
       categories: { include: { category: true } },
+      images: { orderBy: { order: 'asc' } },
     },
   })
 
@@ -47,8 +48,8 @@ export default async function RecipeDetailPage({ params }: Props) {
 
         {/* 上段: 画像 + タイトル・説明 */}
         <div className="flex flex-col lg:flex-row gap-12">
-          {recipe.imageUrl && (
-            <ImageModal src={recipe.imageUrl} alt={recipe.title} />
+          {recipe.images.length > 0 && (
+            <ImageGallery images={recipe.images} alt={recipe.title} />
           )}
           <div className="flex-1 space-y-3">
             <h1 className="text-4xl font-bold text-zinc-900">{recipe.title}</h1>
