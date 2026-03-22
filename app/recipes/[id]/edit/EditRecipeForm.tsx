@@ -47,6 +47,10 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
+  // Main image index (across allImages)
+  const initialMainIndex = initialValues.images.findIndex((img) => img.isMain)
+  const [mainIndex, setMainIndex] = useState(initialMainIndex >= 0 ? initialMainIndex : 0)
+
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -65,7 +69,15 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
   }
 
   const removeExistingImage = (url: string) => {
-    setExistingImages((prev) => prev.filter((img) => img.url !== url))
+    setExistingImages((prev) => {
+      const removedIndex = prev.findIndex((img) => img.url === url)
+      setMainIndex((m) => {
+        if (removedIndex < m) return m - 1
+        if (removedIndex === m) return 0
+        return m
+      })
+      return prev.filter((img) => img.url !== url)
+    })
     setDeletedImageUrls((prev) => [...prev, url])
   }
 
@@ -73,6 +85,11 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
     setImageFile(null)
     setImagePreviewUrl(null)
     setUploadError(null)
+    // If new image was main, reset to first
+    setMainIndex((m) => {
+      const newImgIndex = existingImages.length
+      return m === newImgIndex ? 0 : m
+    })
   }
 
   const addIngredient = () =>
@@ -126,14 +143,11 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
             return
           }
           const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
-          const isFirst = images.length === 0
-          images = [...images, { url: publicUrl, isMain: isFirst, order: images.length }]
+          images = [...images, { url: publicUrl, isMain: false, order: images.length }]
         }
 
-        // Ensure at least one isMain if images exist
-        if (images.length > 0 && !images.some((img) => img.isMain)) {
-          images = images.map((img, i) => ({ ...img, isMain: i === 0 }))
-        }
+        // Apply mainIndex
+        images = images.map((img, i) => ({ ...img, isMain: i === mainIndex }))
 
         await updateRecipe(recipeId, {
           title,
@@ -155,7 +169,7 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
 
   const allImages = [
     ...existingImages.map((img) => ({ ...img, isNew: false })),
-    ...(imagePreviewUrl ? [{ url: imagePreviewUrl, isMain: existingImages.length === 0, order: existingImages.length, isNew: true }] : []),
+    ...(imagePreviewUrl ? [{ url: imagePreviewUrl, isMain: false, order: existingImages.length, isNew: true }] : []),
   ]
 
   return (
@@ -194,14 +208,21 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
               <div className="flex flex-wrap gap-2">
                 {allImages.map((img, index) => (
                   <div key={img.url} className="relative">
-                    {img.isNew ? (
-                      <img src={img.url} alt="プレビュー" className="w-20 h-20 object-cover rounded-lg" />
-                    ) : (
-                      <div className="relative w-20 h-20 rounded-lg overflow-hidden">
-                        <Image src={img.url} alt="レシピ画像" fill className="object-cover" sizes="80px" />
-                      </div>
-                    )}
-                    {index === 0 && (
+                    <button
+                      type="button"
+                      aria-label={index === mainIndex ? 'メイン画像' : 'メインに設定'}
+                      onClick={() => setMainIndex(index)}
+                      className={`block w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${index === mainIndex ? 'border-zinc-900' : 'border-transparent'}`}
+                    >
+                      {img.isNew ? (
+                        <img src={img.url} alt="プレビュー" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="relative w-full h-full">
+                          <Image src={img.url} alt="レシピ画像" fill className="object-cover" sizes="80px" />
+                        </div>
+                      )}
+                    </button>
+                    {index === mainIndex && (
                       <span className="absolute top-0 left-0 text-xs bg-zinc-900 text-white px-1 rounded-tl-lg rounded-br-lg pointer-events-none">メイン</span>
                     )}
                     <button
