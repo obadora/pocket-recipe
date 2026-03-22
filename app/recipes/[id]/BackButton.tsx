@@ -8,7 +8,7 @@ export default function BackButton() {
     <button
       type="button"
       onClick={() => router.back()}
-      className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer"
+      className="text-sm text-zinc-500 hover:text-zinc-900 active:text-zinc-700 transition-colors cursor-pointer"
     >
       ← 戻る
     </button>
