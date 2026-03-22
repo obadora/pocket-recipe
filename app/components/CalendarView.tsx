@@ -109,6 +109,7 @@ export default function CalendarView({ mealRecords, recipes: _recipes, initialMo
     const base = initialMonth ?? new Date()
     return new Date(base.getFullYear(), base.getMonth(), 1)
   })
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null)
 
   const year = currentMonth.getFullYear()
   const month = currentMonth.getMonth()
@@ -127,6 +128,14 @@ export default function CalendarView({ mealRecords, recipes: _recipes, initialMo
 
   const goToPrevMonth = () => setCurrentMonth(new Date(year, month - 1, 1))
   const goToNextMonth = () => setCurrentMonth(new Date(year, month + 1, 1))
+
+  const handleCellClick = (dateKey: string) => {
+    if (selectedDateKey === dateKey) {
+      router.push(`/calendar/${dateKey}`)
+    } else {
+      setSelectedDateKey(dateKey)
+    }
+  }
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -176,13 +185,15 @@ export default function CalendarView({ mealRecords, recipes: _recipes, initialMo
           const dayRecords = cell.isCurrentMonth ? (recordsByDate[cell.dateKey] ?? []) : []
           const dayColor = getDayColor(cell.dayOfWeek, cell.holidayName, cell.isCurrentMonth)
 
+          const isSelected = selectedDateKey === cell.dateKey
+
           return (
             <button
               key={cell.dateKey}
               type="button"
               data-testid={`cell-${cell.dateKey}`}
-              onClick={() => router.push(`/calendar/${cell.dateKey}`)}
-              className="bg-white p-1 flex flex-col items-center transition-colors hover:bg-zinc-50 active:bg-zinc-100 cursor-pointer"
+              onClick={() => handleCellClick(cell.dateKey)}
+              className={`p-1 flex flex-col items-center transition-colors cursor-pointer ${isSelected ? 'bg-zinc-100' : 'bg-white hover:bg-zinc-50 active:bg-zinc-100'}`}
             >
               <span className={`text-xs mb-0.5 ${dayColor}`}>{cell.day}</span>
               {cell.holidayName && (
