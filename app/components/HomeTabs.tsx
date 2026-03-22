@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import RecipeList from './RecipeList'
 import WeekView from './WeekView'
-import { signOut } from '../(auth)/actions'
+import AccountTab from './AccountTab'
 import AddRecipeDropdown from './AddRecipeDropdown'
 
 type Recipe = {
@@ -29,7 +29,7 @@ type MealRecord = {
 type HomeTabsProps = {
   recipes: Recipe[]
   mealRecords: MealRecord[]
-  user: { email: string | undefined }
+  user: { email: string | undefined; username: string | null | undefined; provider: string | undefined }
   recipeCount: number
 }
 
@@ -64,25 +64,7 @@ export default function HomeTabs({ recipes, mealRecords, user, recipeCount }: Ho
         )}
 
         {activeTab === 'account' && (
-          <div className="max-w-7xl w-full mx-auto px-4 py-8 flex flex-col gap-6">
-            <h2 className="text-lg font-semibold text-zinc-900">アカウント</h2>
-            <div className="bg-white rounded-xl border border-zinc-200 divide-y divide-zinc-100">
-              <div className="px-4 py-3">
-                <p className="text-xs text-zinc-400 mb-0.5">メールアドレス</p>
-                <p className="text-sm text-zinc-700">{user.email}</p>
-              </div>
-              <div className="px-4 py-3">
-                <form action={signOut}>
-                  <button
-                    type="submit"
-                    className="text-sm font-medium text-red-600 hover:text-red-800 active:text-red-900 transition-colors cursor-pointer"
-                  >
-                    ログアウト
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
+          <AccountTab user={user} />
         )}
       </main>
 

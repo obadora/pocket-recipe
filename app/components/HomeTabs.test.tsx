@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 
 vi.mock('./WeekView', () => ({ default: () => <div>WeekView</div> }))
 vi.mock('./RecipeList', () => ({ default: () => <div>RecipeList</div> }))
+vi.mock('./AccountTab', () => ({ default: () => <div>AccountTab</div> }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -12,7 +13,7 @@ vi.mock('./AddRecipeDropdown', () => ({ default: () => <div>AddRecipeDropdown</d
 
 import HomeTabs from './HomeTabs'
 
-const defaultUser = { email: 'test@example.com' }
+const defaultUser = { email: 'test@example.com', username: null, provider: 'email' }
 const defaultProps = { recipes: [], mealRecords: [], user: defaultUser, recipeCount: 0 }
 
 describe('HomeTabs', () => {
@@ -49,22 +50,15 @@ describe('HomeTabs', () => {
   })
 
   it('ヘッダーはどのタブでも表示されない', () => {
-    render(<HomeTabs {...defaultProps} user={{ email: 'hello@example.com' }} />)
+    render(<HomeTabs {...defaultProps} user={{ email: 'hello@example.com', username: null, provider: 'email' }} />)
     expect(screen.queryByRole('banner')).not.toBeInTheDocument()
   })
 
-  it('アカウントタブでメールアドレスが表示される', async () => {
-    const user = userEvent.setup()
-    render(<HomeTabs {...defaultProps} user={{ email: 'hello@example.com' }} />)
-    await user.click(screen.getByRole('button', { name: 'アカウント' }))
-    expect(screen.getByText('hello@example.com')).toBeInTheDocument()
-  })
-
-  it('アカウントタブでログアウトボタンが表示される', async () => {
+  it('アカウントタブクリックで AccountTab が表示される', async () => {
     const user = userEvent.setup()
     render(<HomeTabs {...defaultProps} />)
     await user.click(screen.getByRole('button', { name: 'アカウント' }))
-    expect(screen.getByRole('button', { name: 'ログアウト' })).toBeInTheDocument()
+    expect(screen.getByText('AccountTab')).toBeInTheDocument()
   })
 
   it('リストタブではレシピ件数が表示される', () => {
