@@ -37,7 +37,7 @@ export default async function Home() {
       <HomeTabs
         recipes={recipes}
         mealRecords={mealRecords}
-        user={{ email: user?.email, username: dbUser?.username }}
+        user={{ email: user?.email, username: dbUser?.username, provider: user?.app_metadata?.provider }}
         recipeCount={recipes.length}
       />
     </Suspense>

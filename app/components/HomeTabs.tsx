@@ -29,7 +29,7 @@ type MealRecord = {
 type HomeTabsProps = {
   recipes: Recipe[]
   mealRecords: MealRecord[]
-  user: { email: string | undefined; username: string | null | undefined }
+  user: { email: string | undefined; username: string | null | undefined; provider: string | undefined }
   recipeCount: number
 }
 

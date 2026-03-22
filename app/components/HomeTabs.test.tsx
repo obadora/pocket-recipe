@@ -13,7 +13,7 @@ vi.mock('./AddRecipeDropdown', () => ({ default: () => <div>AddRecipeDropdown</d
 
 import HomeTabs from './HomeTabs'
 
-const defaultUser = { email: 'test@example.com', username: null }
+const defaultUser = { email: 'test@example.com', username: null, provider: 'email' }
 const defaultProps = { recipes: [], mealRecords: [], user: defaultUser, recipeCount: 0 }
 
 describe('HomeTabs', () => {
@@ -50,7 +50,7 @@ describe('HomeTabs', () => {
   })
 
   it('ヘッダーはどのタブでも表示されない', () => {
-    render(<HomeTabs {...defaultProps} user={{ email: 'hello@example.com', username: null }} />)
+    render(<HomeTabs {...defaultProps} user={{ email: 'hello@example.com', username: null, provider: 'email' }} />)
     expect(screen.queryByRole('banner')).not.toBeInTheDocument()
   })
 

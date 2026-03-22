@@ -19,7 +19,8 @@ vi.mock('../(auth)/actions', () => ({ signOut: mockSignOut }))
 
 import AccountTab from './AccountTab'
 
-const defaultUser = { email: 'test@example.com', username: 'yamada_taro' }
+const defaultUser = { email: 'test@example.com', username: 'yamada_taro', provider: 'email' as const }
+const googleUser = { email: 'google@example.com', username: null, provider: 'google' as const }
 
 describe('AccountTab', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -151,5 +152,34 @@ describe('AccountTab', () => {
     await waitFor(() => {
       expect(screen.getByText('パスワードを変更しました')).toBeInTheDocument()
     })
+  })
+})
+
+describe('AccountTab (Google ユーザー)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('メールアドレスが表示される', () => {
+    render(<AccountTab user={googleUser} />)
+    expect(screen.getByText('google@example.com')).toBeInTheDocument()
+  })
+
+  it('メール変更の「編集」ボタンが表示されない', () => {
+    render(<AccountTab user={googleUser} />)
+    expect(screen.queryByRole('button', { name: 'メールアドレスを編集' })).not.toBeInTheDocument()
+  })
+
+  it('パスワード変更の「変更」ボタンが表示されない', () => {
+    render(<AccountTab user={googleUser} />)
+    expect(screen.queryByRole('button', { name: 'パスワードを変更' })).not.toBeInTheDocument()
+  })
+
+  it('Google アカウント登録済みの案内が表示される', () => {
+    render(<AccountTab user={googleUser} />)
+    expect(screen.getByText(/Google/)).toBeInTheDocument()
+  })
+
+  it('ログアウトボタンは表示される', () => {
+    render(<AccountTab user={googleUser} />)
+    expect(screen.getByRole('button', { name: 'ログアウト' })).toBeInTheDocument()
   })
 })

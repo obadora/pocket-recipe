@@ -8,8 +8,11 @@ type AccountTabProps = {
   user: {
     email: string | undefined
     username: string | null | undefined
+    provider: string | undefined
   }
 }
+
+const isOAuthUser = (provider: string | undefined) => provider !== 'email'
 
 export default function AccountTab({ user }: AccountTabProps) {
   const [editingField, setEditingField] = useState<'username' | 'email' | 'password' | null>(null)
@@ -122,7 +125,7 @@ export default function AccountTab({ user }: AccountTabProps) {
         <div className="px-4 py-3">
           <div className="flex items-center justify-between mb-0.5">
             <p className="text-xs text-zinc-400">メールアドレス</p>
-            {editingField !== 'email' && (
+            {!isOAuthUser(user.provider) && editingField !== 'email' && (
               <button
                 type="button"
                 aria-label="メールアドレスを編集"
@@ -133,7 +136,7 @@ export default function AccountTab({ user }: AccountTabProps) {
               </button>
             )}
           </div>
-          {editingField === 'email' ? (
+          {!isOAuthUser(user.provider) && editingField === 'email' ? (
             <form action={handleEmailSubmit} className="flex flex-col gap-2 mt-1">
               <input
                 name="email"
@@ -167,82 +170,87 @@ export default function AccountTab({ user }: AccountTabProps) {
               </div>
             </form>
           ) : (
-            <>
-              <p className="text-sm text-zinc-700">{user.email}</p>
-            </>
+            <p className="text-sm text-zinc-700">{user.email}</p>
           )}
           {message?.field === 'email' && message.type === 'success' && editingField !== 'email' && (
             <p className="text-xs text-green-600 mt-1">{message.text}</p>
           )}
         </div>
 
-        {/* パスワード */}
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between mb-0.5">
-            <p className="text-xs text-zinc-400">パスワード</p>
-            {editingField !== 'password' && (
-              <button
-                type="button"
-                aria-label="パスワードを変更"
-                onClick={() => { setEditingField('password'); setMessage(null) }}
-                className="text-xs text-zinc-500 hover:text-zinc-800 cursor-pointer"
-              >
-                変更
-              </button>
-            )}
+        {/* パスワード / Google案内 */}
+        {isOAuthUser(user.provider) ? (
+          <div className="px-4 py-3">
+            <p className="text-xs text-zinc-400 mb-0.5">ログイン方法</p>
+            <p className="text-sm text-zinc-500">Google アカウントで登録済みのため、メールアドレスとパスワードの変更はできません。</p>
           </div>
-          {editingField === 'password' ? (
-            <form action={handlePasswordSubmit} className="flex flex-col gap-2 mt-1">
-              <div className="flex flex-col gap-1">
-                <label htmlFor="new-password" className="text-xs text-zinc-500">新しいパスワード</label>
-                <input
-                  id="new-password"
-                  name="password"
-                  type="password"
-                  className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
-                  disabled={isPending}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label htmlFor="confirm-password" className="text-xs text-zinc-500">パスワード確認</label>
-                <input
-                  id="confirm-password"
-                  name="confirmPassword"
-                  type="password"
-                  className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
-                  disabled={isPending}
-                />
-              </div>
-              {message?.field === 'password' && (
-                <p className={`text-xs ${message.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>
-                  {message.text}
-                </p>
-              )}
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="px-3 py-1 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 disabled:opacity-50 cursor-pointer"
-                >
-                  パスワードを変更する
-                </button>
+        ) : (
+          <div className="px-4 py-3">
+            <div className="flex items-center justify-between mb-0.5">
+              <p className="text-xs text-zinc-400">パスワード</p>
+              {editingField !== 'password' && (
                 <button
                   type="button"
-                  aria-label="キャンセル"
-                  onClick={() => { setEditingField(null); setMessage(null) }}
-                  className="px-3 py-1 rounded-lg bg-zinc-100 text-zinc-700 text-sm font-medium hover:bg-zinc-200 cursor-pointer"
+                  aria-label="パスワードを変更"
+                  onClick={() => { setEditingField('password'); setMessage(null) }}
+                  className="text-xs text-zinc-500 hover:text-zinc-800 cursor-pointer"
                 >
-                  キャンセル
+                  変更
                 </button>
-              </div>
-            </form>
-          ) : (
-            <p className="text-sm text-zinc-400">••••••••</p>
-          )}
-          {message?.field === 'password' && message.type === 'success' && editingField !== 'password' && (
-            <p className="text-xs text-green-600 mt-1">{message.text}</p>
-          )}
-        </div>
+              )}
+            </div>
+            {editingField === 'password' ? (
+              <form action={handlePasswordSubmit} className="flex flex-col gap-2 mt-1">
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="new-password" className="text-xs text-zinc-500">新しいパスワード</label>
+                  <input
+                    id="new-password"
+                    name="password"
+                    type="password"
+                    className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                    disabled={isPending}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="confirm-password" className="text-xs text-zinc-500">パスワード確認</label>
+                  <input
+                    id="confirm-password"
+                    name="confirmPassword"
+                    type="password"
+                    className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                    disabled={isPending}
+                  />
+                </div>
+                {message?.field === 'password' && (
+                  <p className={`text-xs ${message.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                    {message.text}
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="px-3 py-1 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 disabled:opacity-50 cursor-pointer"
+                  >
+                    パスワードを変更する
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="キャンセル"
+                    onClick={() => { setEditingField(null); setMessage(null) }}
+                    className="px-3 py-1 rounded-lg bg-zinc-100 text-zinc-700 text-sm font-medium hover:bg-zinc-200 cursor-pointer"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <p className="text-sm text-zinc-400">••••••••</p>
+            )}
+            {message?.field === 'password' && message.type === 'success' && editingField !== 'password' && (
+              <p className="text-xs text-green-600 mt-1">{message.text}</p>
+            )}
+          </div>
+        )}
 
         {/* ログアウト */}
         <div className="px-4 py-3">
