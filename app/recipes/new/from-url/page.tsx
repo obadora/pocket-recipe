@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { createRecipe, type IngredientInput, type StepInput } from '../../actions'
 import { parseRecipeFromUrl } from '../../../utils/recipeUrlParser'
+import { normalizeUrl } from '../../../utils/urlNormalizer'
 
 function FromUrlPageInner() {
   const router = useRouter()
@@ -35,17 +36,17 @@ function FromUrlPageInner() {
       setUrlError('URLを入力してください。')
       return
     }
-    try {
-      new URL(url)
-    } catch {
+    const normalized = normalizeUrl(url)
+    if (!normalized) {
       setUrlError('有効なURLを入力してください。')
       return
     }
+    setUrl(normalized)
     setUrlError(null)
     setParseError(null)
     setIsParsing(true)
     try {
-      const parsed = await parseRecipeFromUrl(url)
+      const parsed = await parseRecipeFromUrl(normalized)
       if (parsed.title !== null) setTitle(parsed.title)
       if (parsed.description !== null) setDescription(parsed.description)
       if (parsed.servings !== null) setServings(String(parsed.servings))
@@ -162,7 +163,7 @@ function FromUrlPageInner() {
             )}
             <div className="flex gap-2">
               <input
-                type="url"
+                type="text"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://example.com/recipe"

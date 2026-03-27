@@ -32,6 +32,7 @@ const validRecipe: ParsedRecipe = {
   cookTime: 30,
   ingredients: [{ name: '玉ねぎ', amount: '1', unit: '個' }],
   steps: ['玉ねぎを炒める', 'カレールーを加える'],
+  imageUrl: null,
 }
 
 describe('FromUrlPage', () => {
@@ -223,6 +224,84 @@ describe('FromUrlPage', () => {
         expect.objectContaining({ title: 'カレーライス' }),
         undefined
       )
+    })
+  })
+
+  describe('URL正規化', () => {
+    it('#share_ios 付きURL → フラグメントを除去して parseRecipeFromUrl が呼ばれる', async () => {
+      const user = userEvent.setup()
+      render(<FromUrlPage />)
+
+      await user.type(
+        screen.getByPlaceholderText('https://example.com/recipe'),
+        'https://delishkitchen.tv/recipes/147726740259602726#share_ios'
+      )
+      await user.click(screen.getByText('URLから読み込む'))
+
+      await waitFor(() => {
+        expect(mockParseRecipeFromUrl).toHaveBeenCalledWith(
+          'https://delishkitchen.tv/recipes/147726740259602726'
+        )
+      })
+    })
+
+    it('#share_ios 付きURL → 入力フィールドが正規化URLに更新される', async () => {
+      const user = userEvent.setup()
+      render(<FromUrlPage />)
+
+      await user.type(
+        screen.getByPlaceholderText('https://example.com/recipe'),
+        'https://delishkitchen.tv/recipes/147726740259602726#share_ios'
+      )
+      await user.click(screen.getByText('URLから読み込む'))
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('https://delishkitchen.tv/recipes/147726740259602726')).toBeInTheDocument()
+      })
+    })
+
+    it('テキスト埋め込みURL → URLを抽出して parseRecipeFromUrl が呼ばれる', async () => {
+      const user = userEvent.setup()
+      render(<FromUrlPage />)
+
+      await user.type(
+        screen.getByPlaceholderText('https://example.com/recipe'),
+        'パクパク食べれる！基本のホイコーロー https://example.com/recipe/123'
+      )
+      await user.click(screen.getByText('URLから読み込む'))
+
+      await waitFor(() => {
+        expect(mockParseRecipeFromUrl).toHaveBeenCalledWith('https://example.com/recipe/123')
+      })
+    })
+
+    it('UTMパラメータ付きURL → UTMを除去して parseRecipeFromUrl が呼ばれる', async () => {
+      const user = userEvent.setup()
+      render(<FromUrlPage />)
+
+      await user.type(
+        screen.getByPlaceholderText('https://example.com/recipe'),
+        'https://example.com/recipe?utm_source=twitter'
+      )
+      await user.click(screen.getByText('URLから読み込む'))
+
+      await waitFor(() => {
+        expect(mockParseRecipeFromUrl).toHaveBeenCalledWith('https://example.com/recipe')
+      })
+    })
+
+    it('URLを含まないテキスト → バリデーションエラーが表示される', async () => {
+      const user = userEvent.setup()
+      render(<FromUrlPage />)
+
+      await user.type(
+        screen.getByPlaceholderText('https://example.com/recipe'),
+        'これはURLではありません'
+      )
+      await user.click(screen.getByText('URLから読み込む'))
+
+      expect(screen.getByText('有効なURLを入力してください。')).toBeInTheDocument()
+      expect(mockParseRecipeFromUrl).not.toHaveBeenCalled()
     })
   })
 })
