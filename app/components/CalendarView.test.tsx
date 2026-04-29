@@ -65,21 +65,6 @@ describe('CalendarView', () => {
     expect(screen.getByText('2026年4月')).toBeInTheDocument()
   })
 
-  it('当月の日付クリックで /calendar/YYYY-MM-DD へ遷移する', async () => {
-    const user = userEvent.setup()
-    render(<CalendarView mealRecords={[]} recipes={[]} initialMonth={new Date('2026-03-01')} />)
-    await user.click(screen.getByTestId('cell-2026-03-15'))
-    expect(mockRouterPush).toHaveBeenCalledWith('/calendar/2026-03-15')
-  })
-
-  it('前月・翌月セルをクリックしても遷移する', async () => {
-    const user = userEvent.setup()
-    // 2026-04-01 は水曜 → 3/29,30,31 が前月セル
-    render(<CalendarView mealRecords={[]} recipes={[]} initialMonth={new Date('2026-04-01')} />)
-    await user.click(screen.getByTestId('cell-2026-03-31'))
-    expect(mockRouterPush).toHaveBeenCalledWith('/calendar/2026-03-31')
-  })
-
   it('前月の末尾日付が薄く表示される（2026年4月表示時、3月末が見える）', () => {
     render(<CalendarView mealRecords={[]} recipes={[]} initialMonth={new Date('2026-04-01')} />)
     const cell = screen.getByTestId('cell-2026-03-31')

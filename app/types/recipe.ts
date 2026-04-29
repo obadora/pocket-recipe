@@ -2,6 +2,7 @@ export type ParsedIngredient = {
   name: string
   amount: string
   unit: string
+  group: string | null
 }
 
 export type ParsedRecipe = {
