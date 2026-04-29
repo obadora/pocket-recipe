@@ -70,6 +70,7 @@ model Ingredient {
   name     String
   amount   String?
   unit     String?
+  group    String?
   order    Int
 
   recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)

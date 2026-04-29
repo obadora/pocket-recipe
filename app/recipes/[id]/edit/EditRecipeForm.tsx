@@ -93,7 +93,7 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
   }
 
   const addIngredient = () =>
-    setIngredients((prev) => [...prev, { name: '', amount: '', unit: '' }])
+    setIngredients((prev) => [...prev, { name: '', amount: '', unit: '', group: null }])
   const removeIngredient = (index: number) =>
     setIngredients((prev) => prev.filter((_, i) => i !== index))
   const updateIngredient = (index: number, field: keyof IngredientInput, value: string) =>
@@ -347,6 +347,13 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
             <div className="space-y-2">
               {ingredients.map((ing, index) => (
                 <div key={index} className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={ing.group ?? ''}
+                    onChange={(e) => updateIngredient(index, 'group', e.target.value)}
+                    placeholder="A"
+                    className="w-10 rounded-lg border border-zinc-300 px-2 py-2 text-sm text-center font-bold text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  />
                   <input
                     type="text"
                     value={ing.name}

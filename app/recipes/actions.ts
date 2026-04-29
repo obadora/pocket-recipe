@@ -11,6 +11,7 @@ export type IngredientInput = {
   name: string
   amount: string
   unit: string
+  group?: string | null
 }
 
 export type StepInput = {
@@ -120,6 +121,7 @@ export async function createRecipe(input: CreateRecipeInput, from?: string) {
             name: ing.name.trim(),
             amount: String(ing.amount).trim() || null,
             unit: String(ing.unit).trim() || null,
+            group: ing.group?.trim() || null,
             order: index,
           })),
       },
@@ -204,6 +206,7 @@ export async function updateRecipe(recipeId: string, input: UpdateRecipeInput) {
       name: ing.name.trim(),
       amount: ing.amount.trim() || null,
       unit: ing.unit.trim() || null,
+      group: ing.group?.trim() || null,
       order: index,
     }))
 

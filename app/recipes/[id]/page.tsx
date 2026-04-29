@@ -97,14 +97,31 @@ export default async function RecipeDetailPage({ params }: Props) {
                 </p>
               )}
               <ul className="divide-y divide-zinc-100">
-                {recipe.ingredients.map((ing) => (
-                  <li key={ing.id} className="flex justify-between py-2 text-sm">
-                    <span className="text-zinc-700">{ing.name}</span>
-                    {(ing.amount || ing.unit) && (
-                      <span className="font-medium text-zinc-900">{ing.amount}{ing.unit}</span>
-                    )}
-                  </li>
-                ))}
+                {(() => {
+                  const items: React.ReactNode[] = []
+                  let lastGroup: string | null = undefined as unknown as null
+                  for (const ing of recipe.ingredients) {
+                    if (ing.group !== lastGroup) {
+                      lastGroup = ing.group
+                      if (ing.group) {
+                        items.push(
+                          <li key={`group-${ing.group}`} className="py-1.5 text-xs font-bold text-zinc-400 border-t-0">
+                            {ing.group}
+                          </li>
+                        )
+                      }
+                    }
+                    items.push(
+                      <li key={ing.id} className={`flex justify-between py-2 text-sm${ing.group ? ' pl-3' : ''}`}>
+                        <span className="text-zinc-700">{ing.name}</span>
+                        {(ing.amount || ing.unit) && (
+                          <span className="font-medium text-zinc-900">{ing.amount}{ing.unit}</span>
+                        )}
+                      </li>
+                    )
+                  }
+                  return items
+                })()}
               </ul>
             </section>
           )}
