@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import RecipeList from './RecipeList'
 import WeekView from './WeekView'
 import AccountTab from './AccountTab'
@@ -36,10 +36,13 @@ type HomeTabsProps = {
 type Tab = 'list' | 'calendar' | 'account'
 
 export default function HomeTabs({ recipes, mealRecords, user, recipeCount }: HomeTabsProps) {
+  const router = useRouter()
   const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState<Tab>(
-    searchParams.get('tab') === 'calendar' ? 'calendar' : 'list'
-  )
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const tab = searchParams.get('tab')
+    if (tab === 'calendar' || tab === 'account') return tab
+    return 'list'
+  })
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50">
@@ -78,7 +81,10 @@ export default function HomeTabs({ recipes, mealRecords, user, recipeCount }: Ho
             <button
               key={key}
               type="button"
-              onClick={() => setActiveTab(key)}
+              onClick={() => {
+                setActiveTab(key)
+                router.replace(key === 'list' ? '/' : `/?tab=${key}`)
+              }}
               className={`px-5 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${activeTab === key ? 'bg-zinc-900 text-white active:bg-zinc-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 active:bg-zinc-300'}`}
             >
               {label}
