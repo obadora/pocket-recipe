@@ -152,4 +152,16 @@ describe('WeekView', () => {
     await user.click(screen.getByTestId('day-row-2026-03-09'))
     expect(mockRouterPush).toHaveBeenCalledWith('/calendar/2026-03-09')
   })
+
+  it('祝日（元日）の日付ヘッダーが赤色で表示される', () => {
+    // 2026-01-01(元日)を含む週: 2025-12-29(月)〜2026-01-04(日)
+    render(<WeekView {...defaultProps} initialDate={new Date('2026-01-01T00:00:00')} />)
+    const daySpan = screen.getByTestId('day-label-2026-01-01')
+    expect(daySpan).toHaveClass('text-red-500')
+  })
+
+  it('祝日名（元日）が日付ヘッダーに表示される', () => {
+    render(<WeekView {...defaultProps} initialDate={new Date('2026-01-01T00:00:00')} />)
+    expect(screen.getByText('元日')).toBeInTheDocument()
+  })
 })
