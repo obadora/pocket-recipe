@@ -2,6 +2,16 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import Holidays from 'date-holidays'
+
+const hd = new Holidays('JP')
+
+function getHolidayName(dateKey: string): string | null {
+  const result = hd.isHoliday(new Date(dateKey + 'T00:00:00'))
+  if (!result) return null
+  const holiday = Array.isArray(result) ? result[0] : result
+  return holiday.name
+}
 
 type Recipe = {
   id: string
@@ -154,6 +164,8 @@ export default function WeekView({ mealRecords, initialDate }: WeekViewProps) {
           const isToday = toDateKey(new Date()) === dateKey
           const isSunday = i === 6
           const isSaturday = i === 5
+          const holidayName = getHolidayName(dateKey)
+          const dayColor = isSunday || holidayName ? 'text-red-500' : isSaturday ? 'text-blue-500' : 'text-zinc-500'
 
           return (
             <button
@@ -168,12 +180,17 @@ export default function WeekView({ mealRecords, initialDate }: WeekViewProps) {
               <div className="flex items-start gap-3">
                 {/* 日付 */}
                 <div className="flex-shrink-0 w-10 pt-0.5">
-                  <span className={`text-xs font-medium ${isSunday ? 'text-red-500' : isSaturday ? 'text-blue-500' : 'text-zinc-500'}`}>
+                  <span data-testid={`day-label-${dateKey}`} className={`text-xs font-medium ${dayColor}`}>
                     {DAY_LABELS[i]}
                   </span>
                   <p className={`text-sm font-semibold leading-tight ${isToday ? 'text-zinc-900' : 'text-zinc-700'}`}>
                     {day.getMonth() + 1}/{day.getDate()}
                   </p>
+                  {holidayName && (
+                    <span className="text-[9px] text-red-400 leading-tight">
+                      {holidayName}
+                    </span>
+                  )}
                 </div>
 
                 {/* 記録 */}
