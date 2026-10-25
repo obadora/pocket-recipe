@@ -46,7 +46,7 @@ const defaultInitialValues = {
   ingredients: [{ name: 'じゃがいも', amount: '2', unit: '個' }],
   steps: [{ description: '具材を炒める' }],
   categories: ['和食'],
-  imageUrl: null as string | null,
+  images: [] as Array<{ url: string; isMain: boolean; order: number }>,
 }
 
 describe('EditRecipeForm', () => {
@@ -65,15 +65,18 @@ describe('EditRecipeForm', () => {
     expect(screen.getByText('手順')).toBeInTheDocument()
   })
 
-  it('既存の imageUrl がある場合に現在の写真が表示される', () => {
+  it('既存の images がある場合に写真が表示される', () => {
     render(
       <EditRecipeForm
         recipeId="recipe-1"
-        initialValues={{ ...defaultInitialValues, imageUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/photo.jpg' }}
+        initialValues={{
+          ...defaultInitialValues,
+          images: [{ url: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/photo.jpg', isMain: true, order: 0 }],
+        }}
       />
     )
 
-    expect(screen.getByRole('img', { name: '現在の写真' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'レシピ画像' })).toBeInTheDocument()
   })
 
   it('新しいファイルを選択するとプレビューが表示される', async () => {
@@ -88,7 +91,7 @@ describe('EditRecipeForm', () => {
     })
   })
 
-  it('写真付きで送信すると storage.upload が呼ばれ updateRecipe に imageUrl が渡される', async () => {
+  it('写真付きで送信すると storage.upload が呼ばれ updateRecipe に images が渡される', async () => {
     const user = userEvent.setup()
     mockSupabaseUpload.mockResolvedValue({ data: { path: 'photos/user-1/uuid.jpg' }, error: null })
     mockSupabaseGetPublicUrl.mockReturnValue({ data: { publicUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/uuid.jpg' } })
@@ -103,7 +106,9 @@ describe('EditRecipeForm', () => {
       expect(mockSupabaseUpload).toHaveBeenCalled()
       expect(mockUpdateRecipe).toHaveBeenCalledWith(
         'recipe-1',
-        expect.objectContaining({ imageUrl: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/uuid.jpg' })
+        expect.objectContaining({
+          images: [{ url: 'https://example.supabase.co/storage/v1/object/public/recipe-images/photos/user-1/uuid.jpg', isMain: true, order: 0 }],
+        })
       )
     })
   })

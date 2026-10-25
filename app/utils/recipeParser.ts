@@ -1,8 +1,10 @@
 import type { ParsedRecipe } from '../types/recipe'
 
-export async function parseRecipeFromImage(file: File): Promise<ParsedRecipe> {
+export async function parseRecipeFromImages(files: File[]): Promise<ParsedRecipe> {
   const formData = new FormData()
-  formData.append('image', file)
+  for (const file of files) {
+    formData.append('images[]', file)
+  }
 
   const res = await fetch('/api/recipes/parse', { method: 'POST', body: formData })
 
@@ -11,4 +13,8 @@ export async function parseRecipeFromImage(file: File): Promise<ParsedRecipe> {
   }
 
   return res.json()
+}
+
+export async function parseRecipeFromImage(file: File): Promise<ParsedRecipe> {
+  return parseRecipeFromImages([file])
 }

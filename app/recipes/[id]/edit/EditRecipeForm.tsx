@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
-import { updateRecipe, type IngredientInput, type StepInput } from '../../actions'
+import { updateRecipe, type IngredientInput, type StepInput, type RecipeImageInput } from '../../actions'
 import { createClient } from '../../../utils/supabase/client'
 import { convertImage } from '../../../utils/imageConverter'
 
@@ -16,7 +16,7 @@ type InitialValues = {
   ingredients: IngredientInput[]
   steps: StepInput[]
   categories: string[]
-  imageUrl: string | null
+  images: RecipeImageInput[]
 }
 
 type Props = {
@@ -37,10 +37,19 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
   const [steps, setSteps] = useState<StepInput[]>(initialValues.steps)
   const [categoryInput, setCategoryInput] = useState('')
   const [categories, setCategories] = useState<string[]>(initialValues.categories)
+
+  // Existing images (from DB)
+  const [existingImages, setExistingImages] = useState<RecipeImageInput[]>(initialValues.images)
+  const [deletedImageUrls, setDeletedImageUrls] = useState<string[]>([])
+
+  // New image to add
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
-  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(initialValues.imageUrl)
   const [uploadError, setUploadError] = useState<string | null>(null)
+
+  // Main image index (across allImages)
+  const initialMainIndex = initialValues.images.findIndex((img) => img.isMain)
+  const [mainIndex, setMainIndex] = useState(initialMainIndex >= 0 ? initialMainIndex : 0)
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -59,15 +68,32 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
     }
   }
 
-  const clearImage = () => {
+  const removeExistingImage = (url: string) => {
+    setExistingImages((prev) => {
+      const removedIndex = prev.findIndex((img) => img.url === url)
+      setMainIndex((m) => {
+        if (removedIndex < m) return m - 1
+        if (removedIndex === m) return 0
+        return m
+      })
+      return prev.filter((img) => img.url !== url)
+    })
+    setDeletedImageUrls((prev) => [...prev, url])
+  }
+
+  const clearNewImage = () => {
     setImageFile(null)
     setImagePreviewUrl(null)
-    setExistingImageUrl(null)
     setUploadError(null)
+    // If new image was main, reset to first
+    setMainIndex((m) => {
+      const newImgIndex = existingImages.length
+      return m === newImgIndex ? 0 : m
+    })
   }
 
   const addIngredient = () =>
-    setIngredients((prev) => [...prev, { name: '', amount: '', unit: '' }])
+    setIngredients((prev) => [...prev, { name: '', amount: '', unit: '', group: null }])
   const removeIngredient = (index: number) =>
     setIngredients((prev) => prev.filter((_, i) => i !== index))
   const updateIngredient = (index: number, field: keyof IngredientInput, value: string) =>
@@ -101,7 +127,8 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
     setError(null)
     startTransition(async () => {
       try {
-        let imageUrl: string | undefined = existingImageUrl ?? undefined
+        let images: RecipeImageInput[] = [...existingImages]
+
         if (imageFile) {
           const supabase = createClient()
           const { data: { user } } = await supabase.auth.getUser()
@@ -116,15 +143,34 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
             return
           }
           const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
-          imageUrl = publicUrl
+          images = [...images, { url: publicUrl, isMain: false, order: images.length }]
         }
-        await updateRecipe(recipeId, { title, description, servings, cookTime, ingredients, steps, categories, imageUrl })
+
+        // Apply mainIndex
+        images = images.map((img, i) => ({ ...img, isMain: i === mainIndex }))
+
+        await updateRecipe(recipeId, {
+          title,
+          description,
+          servings,
+          cookTime,
+          ingredients,
+          steps,
+          categories,
+          images,
+          deletedImageUrls,
+        })
       } catch (err) {
         if (isRedirectError(err)) throw err
         setError('保存に失敗しました。もう一度お試しください。')
       }
     })
   }
+
+  const allImages = [
+    ...existingImages.map((img) => ({ ...img, isNew: false })),
+    ...(imagePreviewUrl ? [{ url: imagePreviewUrl, isMain: false, order: existingImages.length, isNew: true }] : []),
+  ]
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -133,7 +179,7 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
           <button
             type="button"
             onClick={() => router.back()}
-            className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+            className="text-sm text-zinc-500 hover:text-zinc-900 px-2 py-1 rounded-lg hover:bg-zinc-100 active:bg-zinc-200 transition-colors"
           >
             ← 戻る
           </button>
@@ -157,27 +203,44 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
                 {uploadError}
               </p>
             )}
-            {imagePreviewUrl ? (
-              <div className="space-y-2">
-                <div className="w-full aspect-video rounded-lg overflow-hidden bg-zinc-100">
-                  <img src={imagePreviewUrl} alt="プレビュー" className="w-full h-full object-cover" />
-                </div>
-                <button type="button" onClick={clearImage} className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
-                  写真を削除
-                </button>
+
+            {allImages.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {allImages.map((img, index) => (
+                  <div key={img.url} className="relative">
+                    <button
+                      type="button"
+                      aria-label={index === mainIndex ? 'メイン画像' : 'メインに設定'}
+                      onClick={() => setMainIndex(index)}
+                      className={`block w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${index === mainIndex ? 'border-zinc-900' : 'border-transparent'}`}
+                    >
+                      {img.isNew ? (
+                        <img src={img.url} alt="プレビュー" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="relative w-full h-full">
+                          <Image src={img.url} alt="レシピ画像" fill className="object-cover" sizes="80px" />
+                        </div>
+                      )}
+                    </button>
+                    {index === mainIndex && (
+                      <span className="absolute top-0 left-0 text-xs bg-zinc-900 text-white px-1 rounded-tl-lg rounded-br-lg pointer-events-none">メイン</span>
+                    )}
+                    <button
+                      type="button"
+                      aria-label="削除"
+                      onClick={() => img.isNew ? clearNewImage() : removeExistingImage(img.url)}
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center leading-none"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
-            ) : existingImageUrl ? (
-              <div className="space-y-2">
-                <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-zinc-100">
-                  <Image src={existingImageUrl} alt="現在の写真" fill className="object-cover" sizes="(max-width: 672px) 100vw, 672px" />
-                </div>
-                <button type="button" onClick={clearImage} className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
-                  写真を削除
-                </button>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center w-full h-32 rounded-lg border-2 border-dashed border-zinc-300 cursor-pointer hover:border-zinc-400 transition-colors">
-                <span className="text-sm text-zinc-500">タップして写真を選択</span>
+            )}
+
+            {!imagePreviewUrl && (
+              <label className="flex flex-col items-center justify-center w-full h-32 rounded-lg border-2 border-dashed border-zinc-300 cursor-pointer hover:border-zinc-400 active:bg-zinc-50 transition-colors">
+                <span className="text-sm text-zinc-500">タップして写真を追加</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -261,7 +324,7 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
               <button
                 type="button"
                 onClick={addCategory}
-                className="px-4 py-2 text-sm font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 transition-colors"
+                className="px-4 py-2 text-sm font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 active:bg-zinc-800 transition-colors"
               >
                 追加
               </button>
@@ -271,7 +334,7 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
                 {categories.map((cat) => (
                   <span key={cat} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm bg-zinc-100 text-zinc-700">
                     {cat}
-                    <button type="button" onClick={() => removeCategory(cat)} className="text-zinc-400 hover:text-zinc-700 transition-colors leading-none">×</button>
+                    <button type="button" onClick={() => removeCategory(cat)} className="text-zinc-400 hover:text-zinc-700 active:text-zinc-900 transition-colors leading-none">×</button>
                   </span>
                 ))}
               </div>
@@ -284,6 +347,13 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
             <div className="space-y-2">
               {ingredients.map((ing, index) => (
                 <div key={index} className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={ing.group ?? ''}
+                    onChange={(e) => updateIngredient(index, 'group', e.target.value)}
+                    placeholder="A"
+                    className="w-10 rounded-lg border border-zinc-300 px-2 py-2 text-sm text-center font-bold text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  />
                   <input
                     type="text"
                     value={ing.name}
@@ -306,12 +376,12 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
                     className="w-20 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
                   />
                   {ingredients.length > 1 && (
-                    <button type="button" onClick={() => removeIngredient(index)} className="text-zinc-400 hover:text-red-500 transition-colors text-lg leading-none">×</button>
+                    <button type="button" onClick={() => removeIngredient(index)} className="text-zinc-400 hover:text-red-500 active:text-red-600 transition-colors text-lg leading-none">×</button>
                   )}
                 </div>
               ))}
             </div>
-            <button type="button" onClick={addIngredient} className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
+            <button type="button" onClick={addIngredient} className="text-sm text-zinc-500 hover:text-zinc-900 active:text-zinc-700 transition-colors">
               + 材料を追加
             </button>
           </section>
@@ -333,12 +403,12 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
                     className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 resize-none"
                   />
                   {steps.length > 1 && (
-                    <button type="button" onClick={() => removeStep(index)} className="mt-2.5 text-zinc-400 hover:text-red-500 transition-colors text-lg leading-none">×</button>
+                    <button type="button" onClick={() => removeStep(index)} className="mt-2.5 text-zinc-400 hover:text-red-500 active:text-red-600 transition-colors text-lg leading-none">×</button>
                   )}
                 </div>
               ))}
             </div>
-            <button type="button" onClick={addStep} className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
+            <button type="button" onClick={addStep} className="text-sm text-zinc-500 hover:text-zinc-900 active:text-zinc-700 transition-colors">
               + 手順を追加
             </button>
           </section>
@@ -348,14 +418,14 @@ export default function EditRecipeForm({ recipeId, initialValues }: Props) {
             <button
               type="button"
               onClick={() => router.back()}
-              className="flex-1 py-3 rounded-xl border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              className="flex-1 py-3 rounded-xl border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
             >
               キャンセル
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="flex-1 py-3 rounded-xl bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 py-3 rounded-xl bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 active:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isPending ? '保存中...' : '変更を保存'}
             </button>

@@ -25,7 +25,7 @@ const makeRecipe = (id: string, title: string) => ({
   description: null,
   servings: null,
   cookTime: null,
-  imageUrl: null,
+  images: [] as Array<{ url: string; isMain: boolean; order: number }>,
   categories: [] as Array<{ category: { id: string; name: string } }>,
 })
 

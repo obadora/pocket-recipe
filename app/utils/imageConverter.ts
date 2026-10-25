@@ -15,6 +15,24 @@ export async function prepareImageForCrop(file: File): Promise<string> {
   return URL.createObjectURL(file)
 }
 
+export async function prepareImagesForUpload(
+  files: File[]
+): Promise<{ file: File; previewUrl: string }[]> {
+  return Promise.all(
+    files.map(async (f) => {
+      if (isHeic(f)) {
+        const { heicTo } = await import('heic-to')
+        const blob = await heicTo({ blob: f, type: 'image/jpeg', quality: 0.7 })
+        const baseName = f.name.replace(/\.[^.]+$/, '')
+        const file = new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' })
+        const previewUrl = URL.createObjectURL(blob)
+        return { file, previewUrl }
+      }
+      return { file: f, previewUrl: URL.createObjectURL(f) }
+    })
+  )
+}
+
 export async function convertImage(file: File): Promise<{ convertedFile: File; previewUrl: string }> {
   const { heicTo } = await import('heic-to')
   const blob = await heicTo({ blob: file, type: 'image/jpeg', quality: 0.7 })

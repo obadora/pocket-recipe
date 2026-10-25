@@ -7,9 +7,14 @@ import { prisma } from '../../lib/prisma'
 export async function signUp(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+  const username = (formData.get('username') as string | null) || null
 
   const supabase = await createClient()
-  const { data, error } = await supabase.auth.signUp({ email, password })
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { username } },
+  })
 
   if (error) {
     redirect(`/signup?error=${encodeURIComponent(error.message)}`)
@@ -33,7 +38,7 @@ export async function signIn(formData: FormData) {
   await prisma.user.upsert({
     where: { id: data.user.id },
     update: {},
-    create: { id: data.user.id, email: data.user.email! },
+    create: { id: data.user.id, email: data.user.email!, username: data.user.user_metadata?.username || null },
   })
 
   redirect('/')

@@ -33,6 +33,18 @@ export default async function SignupPage({ searchParams }: Props) {
         </div>
 
         <div className="flex flex-col gap-1">
+          <label htmlFor="username" className="text-sm font-medium text-zinc-700">
+            ユーザー名 <span className="text-xs font-normal text-zinc-400">（任意）</span>
+          </label>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
           <label htmlFor="password" className="text-sm font-medium text-zinc-700">
             パスワード
           </label>

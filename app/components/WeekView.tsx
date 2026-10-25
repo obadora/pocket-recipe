@@ -2,6 +2,16 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import Holidays from 'date-holidays'
+
+const hd = new Holidays('JP')
+
+function getHolidayName(dateKey: string): string | null {
+  const result = hd.isHoliday(new Date(dateKey + 'T00:00:00'))
+  if (!result) return null
+  const holiday = Array.isArray(result) ? result[0] : result
+  return holiday.name
+}
 
 type Recipe = {
   id: string
@@ -100,17 +110,24 @@ export default function WeekView({ mealRecords, initialDate }: WeekViewProps) {
           type="button"
           aria-label="前週"
           onClick={goToPrevWeek}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200 transition-colors cursor-pointer"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           前週
         </button>
-        <span className="text-sm font-semibold text-zinc-900">{rangeLabel}</span>
+        <button
+          type="button"
+          aria-label="今週"
+          onClick={() => setWeekMonday(getWeekMonday(new Date()))}
+          className="text-sm font-semibold text-zinc-900 hover:text-zinc-600 active:text-zinc-400 transition-colors cursor-pointer"
+        >
+          {rangeLabel}
+        </button>
         <button
           type="button"
           aria-label="翌週"
           onClick={goToNextWeek}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200 transition-colors cursor-pointer"
         >
           翌週
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -125,7 +142,7 @@ export default function WeekView({ mealRecords, initialDate }: WeekViewProps) {
             type="button"
             onClick={() => setFilter(f)}
             className={`px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-              filter === f ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              filter === f ? 'bg-zinc-900 text-white active:bg-zinc-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 active:bg-zinc-300'
             }`}
           >
             {f === 'all' ? 'すべて' : f === 'ate' ? '食べた' : '作った'}
@@ -147,6 +164,8 @@ export default function WeekView({ mealRecords, initialDate }: WeekViewProps) {
           const isToday = toDateKey(new Date()) === dateKey
           const isSunday = i === 6
           const isSaturday = i === 5
+          const holidayName = getHolidayName(dateKey)
+          const dayColor = isSunday || holidayName ? 'text-red-500' : isSaturday ? 'text-blue-500' : 'text-zinc-500'
 
           return (
             <button
@@ -154,19 +173,24 @@ export default function WeekView({ mealRecords, initialDate }: WeekViewProps) {
               type="button"
               data-testid={`day-row-${dateKey}`}
               onClick={() => router.push(`/calendar/${dateKey}`)}
-              className={`w-full text-left rounded-xl border px-3 py-2 transition-colors cursor-pointer hover:bg-zinc-50 ${
+              className={`w-full text-left rounded-xl border px-3 py-2 transition-colors cursor-pointer hover:bg-zinc-50 active:bg-zinc-100 ${
                 isToday ? 'border-zinc-400 bg-zinc-50' : 'border-zinc-200 bg-white'
               }`}
             >
               <div className="flex items-start gap-3">
                 {/* 日付 */}
                 <div className="flex-shrink-0 w-10 pt-0.5">
-                  <span className={`text-xs font-medium ${isSunday ? 'text-red-500' : isSaturday ? 'text-blue-500' : 'text-zinc-500'}`}>
+                  <span data-testid={`day-label-${dateKey}`} className={`text-xs font-medium ${dayColor}`}>
                     {DAY_LABELS[i]}
                   </span>
                   <p className={`text-sm font-semibold leading-tight ${isToday ? 'text-zinc-900' : 'text-zinc-700'}`}>
                     {day.getMonth() + 1}/{day.getDate()}
                   </p>
+                  {holidayName && (
+                    <span className="text-[9px] text-red-400 leading-tight">
+                      {holidayName}
+                    </span>
+                  )}
                 </div>
 
                 {/* 記録 */}

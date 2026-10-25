@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import RecipeList from './RecipeList'
 import WeekView from './WeekView'
-import { signOut } from '../(auth)/actions'
+import AccountTab from './AccountTab'
 import AddRecipeDropdown from './AddRecipeDropdown'
 
 type Recipe = {
@@ -13,7 +13,7 @@ type Recipe = {
   description: string | null
   servings: number | null
   cookTime: number | null
-  imageUrl: string | null
+  images: Array<{ url: string; isMain: boolean; order: number }>
   categories: Array<{ category: { id: string; name: string } }>
 }
 
@@ -29,17 +29,20 @@ type MealRecord = {
 type HomeTabsProps = {
   recipes: Recipe[]
   mealRecords: MealRecord[]
-  user: { email: string | undefined }
+  user: { email: string | undefined; username: string | null | undefined; provider: string | undefined }
   recipeCount: number
 }
 
 type Tab = 'list' | 'calendar' | 'account'
 
 export default function HomeTabs({ recipes, mealRecords, user, recipeCount }: HomeTabsProps) {
+  const router = useRouter()
   const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState<Tab>(
-    searchParams.get('tab') === 'calendar' ? 'calendar' : 'list'
-  )
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const tab = searchParams.get('tab')
+    if (tab === 'calendar' || tab === 'account') return tab
+    return 'list'
+  })
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50">
@@ -64,25 +67,7 @@ export default function HomeTabs({ recipes, mealRecords, user, recipeCount }: Ho
         )}
 
         {activeTab === 'account' && (
-          <div className="max-w-7xl w-full mx-auto px-4 py-8 flex flex-col gap-6">
-            <h2 className="text-lg font-semibold text-zinc-900">アカウント</h2>
-            <div className="bg-white rounded-xl border border-zinc-200 divide-y divide-zinc-100">
-              <div className="px-4 py-3">
-                <p className="text-xs text-zinc-400 mb-0.5">メールアドレス</p>
-                <p className="text-sm text-zinc-700">{user.email}</p>
-              </div>
-              <div className="px-4 py-3">
-                <form action={signOut}>
-                  <button
-                    type="submit"
-                    className="text-sm font-medium text-red-600 hover:text-red-800 transition-colors cursor-pointer"
-                  >
-                    ログアウト
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
+          <AccountTab user={user} />
         )}
       </main>
 
@@ -96,8 +81,11 @@ export default function HomeTabs({ recipes, mealRecords, user, recipeCount }: Ho
             <button
               key={key}
               type="button"
-              onClick={() => setActiveTab(key)}
-              className={`px-5 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${activeTab === key ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+              onClick={() => {
+                setActiveTab(key)
+                router.replace(key === 'list' ? '/' : `/?tab=${key}`)
+              }}
+              className={`px-5 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${activeTab === key ? 'bg-zinc-900 text-white active:bg-zinc-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 active:bg-zinc-300'}`}
             >
               {label}
             </button>

@@ -28,7 +28,7 @@ function FromUrlPageInner() {
   const [steps, setSteps] = useState<StepInput[]>([{ description: '' }])
   const [categoryInput, setCategoryInput] = useState('')
   const [categories, setCategories] = useState<string[]>([])
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [parsedImageUrl, setParsedImageUrl] = useState<string | null>(null)
 
   const handleLoadUrl = async () => {
     if (!url.trim()) {
@@ -58,7 +58,7 @@ function FromUrlPageInner() {
         }))
       )
       if (parsed.steps.length > 0) setSteps(parsed.steps.map((s) => ({ description: s })))
-      setImageUrl(parsed.imageUrl)
+      setParsedImageUrl(parsed.imageUrl)
     } catch {
       setParseError('解析に失敗しました。もう一度お試しください。')
     } finally {
@@ -101,6 +101,9 @@ function FromUrlPageInner() {
     setError(null)
     startTransition(async () => {
       try {
+        const images = parsedImageUrl
+          ? [{ url: parsedImageUrl, isMain: true, order: 0 }]
+          : []
         await createRecipe({
           title,
           description,
@@ -109,7 +112,7 @@ function FromUrlPageInner() {
           ingredients,
           steps,
           categories,
-          imageUrl: imageUrl ?? undefined,
+          images,
           sourceType: 'url',
           sourceUrl: url,
         }, from)
@@ -187,13 +190,13 @@ function FromUrlPageInner() {
           </section>
 
           {/* 画像プレビュー */}
-          {imageUrl && (
+          {parsedImageUrl && (
             <section className="bg-white rounded-xl border border-zinc-200 p-6 space-y-2">
               <h2 className="text-base font-semibold text-zinc-900">画像</h2>
               <div className="w-full rounded-lg overflow-hidden bg-zinc-100">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={imageUrl}
+                  src={parsedImageUrl!}
                   alt="レシピ画像"
                   className="w-full object-cover"
                 />

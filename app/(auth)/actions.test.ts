@@ -54,6 +54,26 @@ describe('signUp', () => {
     )
   })
 
+  it('username を Supabase メタデータに渡す', async () => {
+    mockSignUp.mockResolvedValue({
+      data: { user: { id: 'user-123', email: 'test@example.com' } },
+      error: null,
+    })
+
+    const formData = new FormData()
+    formData.set('email', 'test@example.com')
+    formData.set('password', 'password123')
+    formData.set('username', 'yamada_taro')
+
+    await signUp(formData)
+
+    expect(mockSignUp).toHaveBeenCalledWith({
+      email: 'test@example.com',
+      password: 'password123',
+      options: { data: { username: 'yamada_taro' } },
+    })
+  })
+
   it('失敗時: /signup?error=... にリダイレクトする', async () => {
     mockSignUp.mockResolvedValue({
       data: { user: null },
@@ -78,7 +98,7 @@ describe('signIn', () => {
 
   it('成功時: Prisma upsert を呼び、/ にリダイレクトする', async () => {
     mockSignInWithPassword.mockResolvedValue({
-      data: { user: { id: 'user-123', email: 'test@example.com' } },
+      data: { user: { id: 'user-123', email: 'test@example.com', user_metadata: { username: 'yamada_taro' } } },
       error: null,
     })
     mockUpsert.mockResolvedValue({})
@@ -92,7 +112,7 @@ describe('signIn', () => {
     expect(mockUpsert).toHaveBeenCalledWith({
       where: { id: 'user-123' },
       update: {},
-      create: { id: 'user-123', email: 'test@example.com' },
+      create: { id: 'user-123', email: 'test@example.com', username: 'yamada_taro' },
     })
     expect(mockRedirect).toHaveBeenCalledWith('/')
   })

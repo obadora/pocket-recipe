@@ -3,16 +3,17 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ParsedRecipe } from '../../../types/recipe'
 
-const { mockParseRecipe, mockCreateRecipe, mockRouterBack, mockPrepareImageForCrop, mockSearchParamsGet } = vi.hoisted(() => ({
+const { mockParseRecipe, mockCreateRecipe, mockRouterBack, mockPrepareImageForCrop, mockPrepareImagesForUpload, mockSearchParamsGet } = vi.hoisted(() => ({
   mockParseRecipe: vi.fn(),
   mockCreateRecipe: vi.fn(),
   mockRouterBack: vi.fn(),
   mockPrepareImageForCrop: vi.fn(),
+  mockPrepareImagesForUpload: vi.fn(),
   mockSearchParamsGet: vi.fn().mockReturnValue(null),
 }))
 
 vi.mock('../../../utils/recipeParser', () => ({
-  parseRecipeFromImage: mockParseRecipe,
+  parseRecipeFromImages: mockParseRecipe,
 }))
 
 vi.mock('../../actions', () => ({
@@ -26,6 +27,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('../../../utils/imageConverter', () => ({
   prepareImageForCrop: mockPrepareImageForCrop,
+  prepareImagesForUpload: mockPrepareImagesForUpload,
 }))
 
 vi.mock('../../../utils/supabase/client', () => ({
@@ -79,8 +81,8 @@ const validRecipe: ParsedRecipe = {
 }
 
 // Helper: upload a file and confirm the crop
-async function uploadAndConfirmCrop(user: ReturnType<typeof userEvent.setup>, file: File) {
-  await user.upload(screen.getByLabelText('写真を選択'), file)
+async function uploadAndConfirmCrop(user: ReturnType<typeof userEvent.setup>, file: File, inputLabel = '写真を選択') {
+  await user.upload(screen.getByLabelText(inputLabel), file)
   await waitFor(() => expect(screen.getByText('この範囲で決定')).toBeInTheDocument())
   await user.click(screen.getByText('この範囲で決定'))
 }
@@ -89,6 +91,9 @@ describe('FromPhotoPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockPrepareImageForCrop.mockResolvedValue('blob:mock')
+    mockPrepareImagesForUpload.mockResolvedValue([
+      { file: new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' }), previewUrl: 'blob:mock' },
+    ])
     mockParseRecipe.mockResolvedValue(validRecipe)
   })
 
@@ -109,7 +114,7 @@ describe('FromPhotoPage', () => {
     })
   })
 
-  it('クロップ確定後にプレビューが表示される', async () => {
+  it('クロップ確定後にサムネイルが表示される', async () => {
     const user = userEvent.setup()
     render(<FromPhotoPage />)
 
@@ -117,16 +122,31 @@ describe('FromPhotoPage', () => {
     await uploadAndConfirmCrop(user, file)
 
     await waitFor(() => {
-      expect(screen.getByRole('img', { name: 'プレビュー' })).toBeInTheDocument()
+      expect(screen.getByText('1枚選択中')).toBeInTheDocument()
     })
   })
 
-  it('クロップ確定後に自動で parseRecipeFromImage が呼ばれ、フォームに自動入力される', async () => {
+  it('クロップ確定後は自動解析されない（「解析する」ボタンが表示される）', async () => {
     const user = userEvent.setup()
     render(<FromPhotoPage />)
 
     const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
     await uploadAndConfirmCrop(user, file)
+
+    await waitFor(() => screen.getByText('1枚選択中'))
+    expect(mockParseRecipe).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '解析する' })).toBeInTheDocument()
+  })
+
+  it('「解析する」ボタンを押すと parseRecipeFromImages が呼ばれフォームに自動入力される', async () => {
+    const user = userEvent.setup()
+    render(<FromPhotoPage />)
+
+    const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
+    await uploadAndConfirmCrop(user, file)
+    await waitFor(() => screen.getByText('1枚選択中'))
+
+    await user.click(screen.getByRole('button', { name: '解析する' }))
 
     await waitFor(() => {
       expect(mockParseRecipe).toHaveBeenCalled()
@@ -145,6 +165,8 @@ describe('FromPhotoPage', () => {
 
     const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
     await uploadAndConfirmCrop(user, file)
+    await waitFor(() => screen.getByText('1枚選択中'))
+    await user.click(screen.getByRole('button', { name: '解析する' }))
 
     await waitFor(() => {
       expect(screen.getByText('画像読み取り中・・・')).toBeInTheDocument()
@@ -160,6 +182,8 @@ describe('FromPhotoPage', () => {
 
     const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
     await uploadAndConfirmCrop(user, file)
+    await waitFor(() => screen.getByText('1枚選択中'))
+    await user.click(screen.getByRole('button', { name: '解析する' }))
 
     await waitFor(() => {
       expect(screen.getByText(/解析に失敗しました/)).toBeInTheDocument()
@@ -183,6 +207,8 @@ describe('FromPhotoPage', () => {
 
     const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
     await uploadAndConfirmCrop(user, file)
+    await waitFor(() => screen.getByText('1枚選択中'))
+    await user.click(screen.getByRole('button', { name: '解析する' }))
 
     await waitFor(() => expect(mockParseRecipe).toHaveBeenCalled())
     expect(screen.getByDisplayValue('手動タイトル')).toBeInTheDocument()
@@ -194,6 +220,8 @@ describe('FromPhotoPage', () => {
 
     const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
     await uploadAndConfirmCrop(user, file)
+    await waitFor(() => screen.getByText('1枚選択中'))
+    await user.click(screen.getByRole('button', { name: '解析する' }))
 
     await waitFor(() => screen.getByDisplayValue('カレーライス'))
     const titleInput = screen.getByDisplayValue('カレーライス')
@@ -211,6 +239,8 @@ describe('FromPhotoPage', () => {
 
     const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
     await uploadAndConfirmCrop(user, file)
+    await waitFor(() => screen.getByText('1枚選択中'))
+    await user.click(screen.getByRole('button', { name: '解析する' }))
     await waitFor(() => screen.getByDisplayValue('カレーライス'))
     await user.click(screen.getByRole('button', { name: 'レシピを保存' }))
 
@@ -230,6 +260,8 @@ describe('FromPhotoPage', () => {
 
     const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
     await uploadAndConfirmCrop(user, file)
+    await waitFor(() => screen.getByText('1枚選択中'))
+    await user.click(screen.getByRole('button', { name: '解析する' }))
     await waitFor(() => screen.getByDisplayValue('カレーライス'))
     await user.click(screen.getByRole('button', { name: 'レシピを保存' }))
 
@@ -238,6 +270,162 @@ describe('FromPhotoPage', () => {
         expect.objectContaining({ title: 'カレーライス' }),
         undefined
       )
+    })
+  })
+
+  describe('複数画像', () => {
+    it('アルバムから2枚選択するとクロップUIが表示されず、サムネイルが表示される', async () => {
+      const user = userEvent.setup()
+      const file1 = new File(['a'], 'photo1.jpg', { type: 'image/jpeg' })
+      const file2 = new File(['b'], 'photo2.jpg', { type: 'image/jpeg' })
+      mockPrepareImagesForUpload.mockResolvedValue([
+        { file: file1, previewUrl: 'blob:mock1' },
+        { file: file2, previewUrl: 'blob:mock2' },
+      ])
+      render(<FromPhotoPage />)
+
+      await user.upload(screen.getByLabelText('写真を選択'), [file1, file2])
+
+      await waitFor(() => {
+        expect(screen.queryByText('この範囲で決定')).not.toBeInTheDocument()
+        expect(screen.getByText('2枚選択中')).toBeInTheDocument()
+      })
+    })
+
+    it('アルバムから2枚選択すると自動で parseRecipeFromImages が呼ばれる', async () => {
+      const user = userEvent.setup()
+      const file1 = new File(['a'], 'photo1.jpg', { type: 'image/jpeg' })
+      const file2 = new File(['b'], 'photo2.jpg', { type: 'image/jpeg' })
+      mockPrepareImagesForUpload.mockResolvedValue([
+        { file: file1, previewUrl: 'blob:mock1' },
+        { file: file2, previewUrl: 'blob:mock2' },
+      ])
+      render(<FromPhotoPage />)
+
+      await user.upload(screen.getByLabelText('写真を選択'), [file1, file2])
+
+      await waitFor(() => {
+        expect(mockParseRecipe).toHaveBeenCalledWith([file1, file2])
+      })
+    })
+
+    it('1枚クロップ後に「写真を追加」でもクロップUIが表示される', async () => {
+      const user = userEvent.setup()
+      render(<FromPhotoPage />)
+
+      const file1 = new File(['a'], 'photo1.jpg', { type: 'image/jpeg' })
+      await uploadAndConfirmCrop(user, file1)
+      await waitFor(() => screen.getByText('1枚選択中'))
+
+      const file2 = new File(['b'], 'photo2.jpg', { type: 'image/jpeg' })
+      await user.upload(screen.getByLabelText('写真を追加'), file2)
+
+      await waitFor(() => {
+        expect(screen.getByText('この範囲で決定')).toBeInTheDocument()
+      })
+    })
+
+    it('2枚クロップ確定後に「解析する」を押すと全枚で parseRecipeFromImages が1回呼ばれる', async () => {
+      const user = userEvent.setup()
+      render(<FromPhotoPage />)
+
+      const file1 = new File(['a'], 'photo1.jpg', { type: 'image/jpeg' })
+      await uploadAndConfirmCrop(user, file1)
+      await waitFor(() => screen.getByText('1枚選択中'))
+
+      const file2 = new File(['b'], 'photo2.jpg', { type: 'image/jpeg' })
+      await uploadAndConfirmCrop(user, file2, '写真を追加')
+      await waitFor(() => screen.getByText('2枚選択中'))
+
+      await user.click(screen.getByRole('button', { name: '解析する' }))
+
+      await waitFor(() => {
+        expect(mockParseRecipe).toHaveBeenCalledTimes(1)
+        expect(mockParseRecipe.mock.calls[0][0]).toHaveLength(2)
+      })
+    })
+
+    it('1枚選択は引き続きクロップUIが表示される（回帰）', async () => {
+      const user = userEvent.setup()
+      render(<FromPhotoPage />)
+
+      const file = new File(['dummy'], 'recipe.jpg', { type: 'image/jpeg' })
+      await user.upload(screen.getByLabelText('写真を選択'), file)
+
+      await waitFor(() => {
+        expect(screen.getByText('この範囲で決定')).toBeInTheDocument()
+      })
+    })
+
+    it('サムネイルの×ボタンで画像を削除できる', async () => {
+      const user = userEvent.setup()
+      const file1 = new File(['a'], 'photo1.jpg', { type: 'image/jpeg' })
+      const file2 = new File(['b'], 'photo2.jpg', { type: 'image/jpeg' })
+      mockPrepareImagesForUpload.mockResolvedValue([
+        { file: file1, previewUrl: 'blob:mock1' },
+        { file: file2, previewUrl: 'blob:mock2' },
+      ])
+      render(<FromPhotoPage />)
+
+      await user.upload(screen.getByLabelText('写真を選択'), [file1, file2])
+      await waitFor(() => screen.getByText('2枚選択中'))
+
+      const removeButtons = screen.getAllByRole('button', { name: '削除' })
+      await user.click(removeButtons[1])
+
+      await waitFor(() => {
+        expect(screen.getByText('1枚選択中')).toBeInTheDocument()
+      })
+    })
+
+    it('6枚選択するとエラーメッセージが表示され、parseRecipeFromImages は呼ばれない', async () => {
+      const user = userEvent.setup()
+      render(<FromPhotoPage />)
+
+      const files = Array.from({ length: 6 }, (_, i) =>
+        new File(['a'], `photo${i}.jpg`, { type: 'image/jpeg' })
+      )
+      await user.upload(screen.getByLabelText('写真を選択'), files)
+
+      await waitFor(() => {
+        expect(screen.getByText(/5枚以下/)).toBeInTheDocument()
+      })
+      expect(mockParseRecipe).not.toHaveBeenCalled()
+    })
+
+    it('5枚選択は許可される', async () => {
+      const user = userEvent.setup()
+      const files = Array.from({ length: 5 }, (_, i) =>
+        new File(['a'], `photo${i}.jpg`, { type: 'image/jpeg' })
+      )
+      mockPrepareImagesForUpload.mockResolvedValue(
+        files.map((f, i) => ({ file: f, previewUrl: `blob:mock${i}` }))
+      )
+      render(<FromPhotoPage />)
+
+      await user.upload(screen.getByLabelText('写真を選択'), files)
+
+      await waitFor(() => {
+        expect(screen.getByText('5枚選択中')).toBeInTheDocument()
+      })
+    })
+
+    it('アルバム一括選択の解析エラーがエラーメッセージを表示する', async () => {
+      const user = userEvent.setup()
+      mockParseRecipe.mockRejectedValue(new Error('parse failed'))
+      const file1 = new File(['a'], 'photo1.jpg', { type: 'image/jpeg' })
+      const file2 = new File(['b'], 'photo2.jpg', { type: 'image/jpeg' })
+      mockPrepareImagesForUpload.mockResolvedValue([
+        { file: file1, previewUrl: 'blob:mock1' },
+        { file: file2, previewUrl: 'blob:mock2' },
+      ])
+      render(<FromPhotoPage />)
+
+      await user.upload(screen.getByLabelText('写真を選択'), [file1, file2])
+
+      await waitFor(() => {
+        expect(screen.getByText(/解析に失敗しました/)).toBeInTheDocument()
+      })
     })
   })
 })

@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       await prisma.user.upsert({
         where: { id: data.user.id },
         update: {},
-        create: { id: data.user.id, email: data.user.email! },
+        create: { id: data.user.id, email: data.user.email!, username: data.user.user_metadata?.username || null },
       })
 
       return NextResponse.redirect(`${origin}/`)

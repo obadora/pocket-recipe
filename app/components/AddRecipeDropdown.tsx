@@ -22,7 +22,7 @@ export default function AddRecipeDropdown() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition-colors flex items-center gap-1"
+        className="px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 active:bg-zinc-800 transition-colors flex items-center gap-1"
       >
         + レシピを追加
         <span className="text-xs">▾</span>
@@ -32,7 +32,7 @@ export default function AddRecipeDropdown() {
           <Link
             href="/recipes/new"
             onClick={() => setOpen(false)}
-            className="block px-4 py-3 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
+            className="block px-4 py-3 text-sm text-zinc-700 hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
           >
             手動で作成
           </Link>

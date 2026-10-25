@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { createClient } from '../../utils/supabase/server'
 import { prisma } from '../../../lib/prisma'
 import DeleteButton from './DeleteButton'
-import ImageModal from './ImageModal'
+import ImageGallery from './ImageGallery'
 import BackButton from './BackButton'
 
 type Props = {
@@ -22,6 +22,7 @@ export default async function RecipeDetailPage({ params }: Props) {
       ingredients: { orderBy: { order: 'asc' } },
       steps: { orderBy: { order: 'asc' } },
       categories: { include: { category: true } },
+      images: { orderBy: { order: 'asc' } },
     },
   })
 
@@ -35,7 +36,7 @@ export default async function RecipeDetailPage({ params }: Props) {
           <div className="flex-1" />
           <Link
             href={`/recipes/${recipe.id}/edit`}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-700 border border-zinc-200 hover:bg-zinc-50 transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-700 border border-zinc-200 hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
           >
             編集
           </Link>
@@ -47,8 +48,8 @@ export default async function RecipeDetailPage({ params }: Props) {
 
         {/* 上段: 画像 + タイトル・説明 */}
         <div className="flex flex-col lg:flex-row gap-12">
-          {recipe.imageUrl && (
-            <ImageModal src={recipe.imageUrl} alt={recipe.title} />
+          {recipe.images.length > 0 && (
+            <ImageGallery images={recipe.images} alt={recipe.title} />
           )}
           <div className="flex-1 space-y-3">
             <h1 className="text-4xl font-bold text-zinc-900">{recipe.title}</h1>
@@ -96,14 +97,31 @@ export default async function RecipeDetailPage({ params }: Props) {
                 </p>
               )}
               <ul className="divide-y divide-zinc-100">
-                {recipe.ingredients.map((ing) => (
-                  <li key={ing.id} className="flex justify-between py-2 text-sm">
-                    <span className="text-zinc-700">{ing.name}</span>
-                    {(ing.amount || ing.unit) && (
-                      <span className="font-medium text-zinc-900">{ing.amount}{ing.unit}</span>
-                    )}
-                  </li>
-                ))}
+                {(() => {
+                  const items: React.ReactNode[] = []
+                  let lastGroup: string | null = undefined as unknown as null
+                  for (const ing of recipe.ingredients) {
+                    if (ing.group !== lastGroup) {
+                      lastGroup = ing.group
+                      if (ing.group) {
+                        items.push(
+                          <li key={`group-${ing.group}`} className="py-1.5 text-xs font-bold text-zinc-400 border-t-0">
+                            {ing.group}
+                          </li>
+                        )
+                      }
+                    }
+                    items.push(
+                      <li key={ing.id} className={`flex justify-between py-2 text-sm${ing.group ? ' pl-3' : ''}`}>
+                        <span className="text-zinc-700">{ing.name}</span>
+                        {(ing.amount || ing.unit) && (
+                          <span className="font-medium text-zinc-900">{ing.amount}{ing.unit}</span>
+                        )}
+                      </li>
+                    )
+                  }
+                  return items
+                })()}
               </ul>
             </section>
           )}
