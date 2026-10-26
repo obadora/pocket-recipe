@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import RecipeList from './RecipeList'
 import WeekView from './WeekView'
 import AccountTab from './AccountTab'
 import AddRecipeDropdown from './AddRecipeDropdown'
+import { filterRecipesByIngredients } from '../utils/recipeSearch'
 
 type Recipe = {
   id: string
@@ -15,6 +16,7 @@ type Recipe = {
   cookTime: number | null
   images: Array<{ url: string; isMain: boolean; order: number }>
   categories: Array<{ category: { id: string; name: string } }>
+  ingredients: Array<{ name: string }>
 }
 
 type MealRecord = {
@@ -43,6 +45,12 @@ export default function HomeTabs({ recipes, mealRecords, user, recipeCount }: Ho
     if (tab === 'calendar' || tab === 'account') return tab
     return 'list'
   })
+  const [ingredientQuery, setIngredientQuery] = useState('')
+  const filteredRecipes = useMemo(
+    () => filterRecipesByIngredients(recipes, ingredientQuery),
+    [recipes, ingredientQuery]
+  )
+  const isSearching = ingredientQuery.trim() !== ''
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50">
@@ -53,10 +61,28 @@ export default function HomeTabs({ recipes, mealRecords, user, recipeCount }: Ho
         {activeTab === 'list' && (
           <>
             <div className="flex items-center justify-between mb-6">
-              <p className="text-sm text-zinc-500">{recipeCount}件のレシピ</p>
+              <p className="text-sm text-zinc-500">
+                {isSearching ? `${recipeCount}件中${filteredRecipes.length}件のレシピ` : `${recipeCount}件のレシピ`}
+              </p>
               <AddRecipeDropdown />
             </div>
-            <RecipeList recipes={recipes} />
+            {recipes.length > 0 && (
+              <input
+                type="search"
+                aria-label="材料で検索"
+                placeholder="材料で検索（例: 鶏肉 玉ねぎ）"
+                value={ingredientQuery}
+                onChange={(e) => setIngredientQuery(e.target.value)}
+                className="w-full mb-6 px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-300"
+              />
+            )}
+            {isSearching && filteredRecipes.length === 0 ? (
+              <p className="text-center py-16 text-sm text-zinc-500">
+                「{ingredientQuery.trim()}」を使うレシピは見つかりませんでした
+              </p>
+            ) : (
+              <RecipeList recipes={filteredRecipes} />
+            )}
           </>
         )}
 

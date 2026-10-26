@@ -19,6 +19,7 @@ export default async function Home() {
         cookTime: true,
         images: { where: { isMain: true }, take: 1 },
         categories: { include: { category: true } },
+        ingredients: { select: { name: true } },
       },
     }),
     prisma.mealRecord.findMany({
